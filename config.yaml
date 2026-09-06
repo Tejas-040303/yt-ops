@@ -1,0 +1,130 @@
+# yt-ops config
+# This file is the single source of truth. Paste it into every Claude Code
+# session so the pipeline does not drift.
+
+channel:
+  name: "Had To Find Out"
+  handle: "@hadtofindout"
+  rule: >
+    Every video tells the story of how somebody found something out.
+    Not what is true, but how we came to know it.
+  pillar: "history of scientific discovery"
+
+# --- Hard gates. A script failing any of these is rejected, not fixed. ---
+gates:
+  must_name_person: true           # a named human
+  must_name_place_or_year: true    # anchors it in reality
+  min_sources_scholarly: 1         # at least one scholarly/primary source
+  reject_if_only_popular_sources: true
+  check_myth_blacklist: true
+  max_similarity_to_past: 0.75     # vs all previous scripts
+  banned_topic_areas:              # policy + ad-suitability risk
+    - medical_advice
+    - financial_advice
+    - religion
+    - current_conflicts
+    - atrocity_and_genocide
+    - living_named_individuals_controversy
+
+# --- Source ranking used during research ---
+sources:
+  kinds_ranked: [primary, scholarly, museum, encyclopedia, popular]
+  preferred_domains:
+    - plato.stanford.edu
+    - archive.org
+    - loc.gov
+    - royalsocietypublishing.org
+    - nasa.gov
+    - si.edu                       # Smithsonian
+    - biodiversitylibrary.org
+  min_sources_per_topic: 4
+  cache_locally: true              # sources disappear; keep a copy
+
+# --- Accounts (competing versions of the story) ---
+accounts:
+  stances: [popular, consensus, disputed, superseded, fringe]
+  never_voice_as_true: [fringe]
+  # If popular != consensus, that gap IS the video.
+  prefer_angle_when_gap: myth_bust
+
+# --- Angles: one topic yields several standalone videos ---
+angles:
+  kinds: [myth_bust, origin, mechanism, person, consequence, unknown_still]
+  max_per_topic: 4
+  min_days_between_same_topic: 3   # never publish two from one topic back to back
+  must_stand_alone: true           # NO "part 1", NO "as we saw last time"
+
+# --- Script ---
+script:
+  target_words: [95, 150]
+  target_seconds: [35, 55]
+  hook_max_words: 12
+  formats: [story_reveal, myth_reality, question_answer, three_facts, timeline]
+  banned_openers:
+    - "Did you know"
+    - "Hey guys"
+    - "In this video"
+    - "Let's dive in"
+  require_citation_per_claim: true
+
+# --- Voice ---
+voice:
+  engine: kokoro
+  model: kokoro-v1
+  speaker: "TBD"                   # pick one and keep it; consistency matters
+  speed: 1.05
+  sample_rate: 24000
+
+# --- Captions ---
+captions:
+  engine: faster-whisper
+  model: base.en
+  word_timestamps: true
+  style: ass
+  max_words_on_screen: 4
+  font: "Inter"
+  safe_area_bottom_pct: 22         # keep above the YouTube UI overlay
+
+# --- Render ---
+render:
+  resolution: [1080, 1920]
+  fps: 30
+  audio_lufs: -14
+  crf: 20
+  music_volume_db: -22
+  max_concurrent: 1                # more than 1 gets you OOM-killed
+
+# --- Assets ---
+assets:
+  allowed_licenses: [public_domain, cc0, cc_by, cc_by_sa, pexels, generated, original]
+  reject_unknown: true
+  require_manifest_row: true
+  attribution_in_description: true
+
+# --- Output ---
+output:
+  dir: "out"
+  code_format: "{seq:04d}-{topic_slug}-{angle_kind}"
+  write_metadata_txt: true         # title, description, hashtags, AI-disclosure reminder
+
+# --- Publishing (manual by you) ---
+publish:
+  per_day: 2
+  slots: ["08:55", "16:30"]
+  method: manual_upload_scheduled  # upload in one sitting, schedule in Studio
+  ai_disclosure_toggle: true       # tick "altered or synthetic content" every time
+
+# --- Analytics ---
+analytics:
+  pull_time: "23:00"
+  api: youtube_analytics_v2
+  scopes:
+    - https://www.googleapis.com/auth/youtube.readonly
+    - https://www.googleapis.com/auth/yt-analytics.readonly
+  review_every_n_videos: 25        # look at patterns, do NOT compute p-values
+
+# --- Ops ---
+ops:
+  db: "db.sqlite"
+  telegram_alerts: [render_failed, oauth_expired, no_video_ready_by_0830]
+  log_level: INFO
