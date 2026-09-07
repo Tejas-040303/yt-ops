@@ -96,7 +96,7 @@ render:
 
 # --- Assets ---
 assets:
-  allowed_licenses: [public_domain, cc0, cc_by, cc_by_sa, pexels, generated, original]
+  allowed_licenses: [public_domain, cc0, pexels, generated, original]
   reject_unknown: true
   require_manifest_row: true
   attribution_in_description: true

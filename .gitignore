@@ -21,4 +21,8 @@ assets/
 
 # os
 Thumbs.db
-desktop.ini
+desktop.
+
+*.mp4
+test*.wav
+voice/
