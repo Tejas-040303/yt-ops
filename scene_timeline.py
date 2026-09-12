@@ -16,18 +16,8 @@ Usage from a storyboard:
              out="clips/02-timeline.mp4")
 """
 
-import os
-import shutil
-import subprocess
-
-from PIL import Image, ImageDraw, ImageFont
-
-W, H, FPS = 1080, 1920, 30
-
-BG = (11, 13, 18)
-INK = (238, 236, 230)
-DIM = (120, 124, 132)
-HOT = (255, 214, 122)
+from scene_kit import (BG, DIM, HOT, INK, blend, ease, frame, lerp, load_font,
+                       render)
 
 TOP = 380
 BOTTOM = 1560
@@ -37,30 +27,6 @@ ENTRY = 0.45          # seconds for each date to arrive
 HOLD = 0.35           # pause between arrivals
 GAP_DRAW = 0.9        # seconds to draw the gap bracket
 GAP_HOLD = 1.2        # hold after the gap is labelled
-
-
-def load_font(size, bold=True):
-    names = ["arialbd.ttf" if bold else "arial.ttf"]
-    for p in ([f"C:/Windows/Fonts/{n}" for n in names] +
-              ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-               "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]):
-        if os.path.exists(p):
-            return ImageFont.truetype(p, size)
-    return ImageFont.load_default()
-
-
-def ease(x):
-    """Ease-out cubic. Movement should decelerate, never arrive linearly."""
-    x = max(0.0, min(1.0, x))
-    return 1 - (1 - x) ** 3
-
-
-def lerp(a, b, t):
-    return a + (b - a) * t
-
-
-def blend(c1, c2, t):
-    return tuple(int(lerp(c1[i], c2[i], t)) for i in range(3))
 
 
 def timeline(events, gap=None, gap_label="", out="clips/timeline.mp4",
@@ -105,15 +71,9 @@ def timeline(events, gap=None, gap_label="", out="clips/timeline.mp4",
     t_events = len(events) * per_event
     t_gap = (GAP_DRAW + GAP_HOLD) if gap else 0.6
     total = t_events + t_gap
-    n = int(total * FPS)
 
-    os.makedirs(frames_dir, exist_ok=True)
-    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-
-    for i in range(n):
-        t = i / FPS
-        im = Image.new("RGB", (W, H), BG)
-        d = ImageDraw.Draw(im)
+    def draw(t):
+        im, d = frame()
 
         # the spine grows downward as events arrive
         grown = min(1.0, ease(t / max(0.001, t_events)))
@@ -156,17 +116,9 @@ def timeline(events, gap=None, gap_label="", out="clips/timeline.mp4",
                 d.text((bx - 40, mid), gap_label.upper(),
                        font=f_gap, fill=col, anchor="rm")
 
-        im.save(os.path.join(frames_dir, f"{i:04d}.png"))
+        return im
 
-    subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-framerate", str(FPS),
-         "-i", os.path.join(frames_dir, "%04d.png"),
-         "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", out],
-        check=True)
-    shutil.rmtree(frames_dir, ignore_errors=True)
-
-    print(f"wrote {out}  ({n} frames, {total:.1f}s)")
-    return total
+    return render(draw, total, out, frames_dir)
 
 
 if __name__ == "__main__":
