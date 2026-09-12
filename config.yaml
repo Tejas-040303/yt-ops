@@ -71,7 +71,8 @@ script:
 voice:
   engine: kokoro
   model: kokoro-v1
-  speaker: "TBD"                   # pick one and keep it; consistency matters
+  narrator: "bf_emma"              # locked. Consistency matters more than variety
+  quote: "bm_george"               # second voice, for source quotations only
   speed: 1.05
   sample_rate: 24000
 
