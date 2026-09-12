@@ -30,6 +30,7 @@ Ease-out cubic on all motion. Nothing arrives linearly.
 import os
 import shutil
 import subprocess
+from contextlib import contextmanager
 from functools import lru_cache
 
 from PIL import Image, ImageDraw, ImageFont
@@ -184,9 +185,33 @@ def tracked(d, xy, text, fnt, fill, track=8, anchor="mm"):
 
 # --- output ------------------------------------------------------
 
+_MEASURING = False
+
+
+@contextmanager
+def measuring():
+    """Inside this block, render() returns what a scene's duration would
+    be without drawing or encoding anything.
+
+    A storyboard has to know how long a scene comes out before it can
+    decide how long to make it. Without this, fitting a scene to its
+    narration beat means rendering it twice.
+    """
+    global _MEASURING
+    was = _MEASURING
+    _MEASURING = True
+    try:
+        yield
+    finally:
+        _MEASURING = was
+
+
 def render(draw, duration, out, frames_dir=None, fps=FPS, crf=18):
     """draw(t) -> Image for time t in seconds. Writes an h264 mp4."""
     n = max(1, int(round(duration * fps)))
+    if _MEASURING:
+        return n / fps
+
     stem = os.path.splitext(os.path.basename(out))[0]
     frames_dir = frames_dir or f"tmp_{stem}"
 

@@ -105,5 +105,5 @@ if __name__ == "__main__":
         "two spheres of lead, the one ten times larger and heavier than "
         "the other... their two sounds seem to be a single clap",
         who="Simon Stevin",
-        source="De Beghinselen der Weeghconst, Leiden 1586",
+        source="De Beghinselen der Weeghconst, 1586",
         out="clips/05-quote.mp4")

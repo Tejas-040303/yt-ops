@@ -165,12 +165,29 @@ def build_black(shot, path, dur):
          "-an", path], "black frame")
 
 
-def main():
-    for d in (TMP, OUT_DIR):
+_UNSET = object()
+
+
+def main(shots=None, code=None, sfx=None, music=_UNSET, music_db=None,
+         audio=None, subs=None, out_dir=None, tmp=None, tail=None):
+    """Assemble one video. Called bare it renders the module's own
+    SHOTS; make.py passes a storyboard's instead."""
+    shots = [dict(x) for x in (SHOTS if shots is None else shots)]
+    code = CODE if code is None else code
+    sfx = SFX if sfx is None else sfx
+    music = MUSIC if music is _UNSET else music
+    music_db = MUSIC_DB if music_db is None else music_db
+    audio = AUDIO if audio is None else audio
+    subs = SUBS if subs is None else subs
+    out_dir = OUT_DIR if out_dir is None else out_dir
+    tmp = TMP if tmp is None else tmp
+    tail = TAIL_SEC if tail is None else tail
+
+    for d in (tmp, out_dir):
         os.makedirs(d, exist_ok=True)
 
-    if not os.path.exists(AUDIO):
-        raise SystemExit(f"{AUDIO} not found -- run make_vo.py first")
+    if not os.path.exists(audio):
+        raise SystemExit(f"{audio} not found -- run make_vo.py first")
 
     # Stretch the final shot to cover the narration plus a tail, so the
     # audio is never truncated by -shortest and the video does not stop
@@ -178,22 +195,22 @@ def main():
     if os.path.exists("vo.json"):
         words = json.load(open("vo.json", encoding="utf-8"))["words"]
         vo_end = words[-1]["end"] if words else 0
-        need = vo_end + TAIL_SEC
-        if SHOTS[-1]["end"] < need:
-            print(f"  extending final shot {SHOTS[-1]['end']:.1f}s "
-                  f"-> {need:.1f}s to cover narration + {TAIL_SEC}s tail")
-            SHOTS[-1]["end"] = round(need, 2)
-        elif SHOTS[-1]["end"] > need + 1.5:
-            print(f"  NOTE: shots run {SHOTS[-1]['end'] - need:.1f}s past "
+        need = vo_end + tail
+        if shots[-1]["end"] < need:
+            print(f"  extending final shot {shots[-1]['end']:.1f}s "
+                  f"-> {need:.1f}s to cover narration + {tail}s tail")
+            shots[-1]["end"] = round(need, 2)
+        elif shots[-1]["end"] > need + 1.5:
+            print(f"  NOTE: shots run {shots[-1]['end'] - need:.1f}s past "
                   f"the narration -- trim SHOTS if that is not deliberate")
         print()
 
     parts = []
-    for i, shot in enumerate(SHOTS):
+    for i, shot in enumerate(shots):
         dur = shot["end"] - shot["start"]
         if dur <= 0:
             raise SystemExit(f"shot {i}: end must be after start")
-        path = os.path.join(TMP, f"{i:02d}.mp4")
+        path = os.path.join(tmp, f"{i:02d}.mp4")
         mode = shot["mode"]
 
         if mode in ("portrait", "wide"):
@@ -210,35 +227,42 @@ def main():
         parts.append(path)
 
     # Concat the shots.
-    total = SHOTS[-1]["end"]
-    listfile = os.path.join(TMP, "concat.txt")
+    total = shots[-1]["end"]
+    listfile = os.path.join(tmp, "concat.txt")
     with open(listfile, "w", encoding="utf-8") as f:
         for p in parts:
             f.write(f"file '{os.path.basename(p)}'\n")
 
-    silent = os.path.join(TMP, "silent.mp4")
+    silent = os.path.join(tmp, "silent.mp4")
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", listfile,
          "-c", "copy", silent], "concat")
 
     # Burn captions, mix audio, write the final file.
-    final = os.path.join(OUT_DIR, f"{CODE}.mp4")
+    final = os.path.join(out_dir, f"{code}.mp4")
 
     # ---- audio graph: voice + optional music bed + timed SFX ----
-    inputs = ["-i", silent, "-i", AUDIO]
-    chains = ["[1:a]loudnorm=I=-14:TP=-1.5:LRA=11,apad[voice]"]
+    # apad must be bounded. Left open it produces an infinite stream,
+    # amix=duration=first then follows it forever, and -shortest does not
+    # terminate a filtergraph: ffmpeg encodes the whole picture, writes
+    # the frames, and then hangs before the moov atom -- leaving an mp4
+    # every player rejects as invalid. whole_dur ends the pad exactly
+    # where the picture ends.
+    inputs = ["-i", silent, "-i", audio]
+    chains = [f"[1:a]loudnorm=I=-14:TP=-1.5:LRA=11,"
+              f"apad=whole_dur={total:.3f}[voice]"]
     mix_labels = ["[voice]"]
     idx = 2
 
-    if MUSIC and os.path.exists(MUSIC):
-        inputs += ["-stream_loop", "-1", "-i", MUSIC]
+    if music and os.path.exists(music):
+        inputs += ["-stream_loop", "-1", "-i", music]
         chains.append(
-            f"[{idx}:a]volume={MUSIC_DB}dB,afade=t=out:st={total-2.0:.2f}:d=2[bed]")
+            f"[{idx}:a]volume={music_db}dB,afade=t=out:st={total-2.0:.2f}:d=2[bed]")
         mix_labels.append("[bed]")
         idx += 1
-    elif MUSIC:
-        print(f"  NOTE: music file {MUSIC} not found -- narration only")
+    elif music:
+        print(f"  NOTE: music file {music} not found -- narration only")
 
-    for path, at, gain in SFX:
+    for path, at, gain in sfx:
         if not os.path.exists(path):
             print(f"  NOTE: sfx {path} not found -- skipped")
             continue
@@ -257,9 +281,9 @@ def main():
             f"dropout_transition=0:normalize=0,"
             f"alimiter=limit=0.95[aout]")
 
-    vf = (f"subtitles={SUBS}:fontsdir='{ff_path(FONTS_DIR)}'"
-          if os.path.exists(SUBS) else "null")
-    if not os.path.exists(SUBS):
+    vf = (f"subtitles={subs}:fontsdir='{ff_path(FONTS_DIR)}'"
+          if os.path.exists(subs) else "null")
+    if not os.path.exists(subs):
         print("  (no captions.ass -- run captions.py to add subtitles)")
     chains.insert(0, f"[0:v]{vf}[vout]")
 
@@ -271,6 +295,7 @@ def main():
          "-shortest", final], "final mux")
 
     print(f"\nwrote {final}")
+    return final
 
 
 if __name__ == "__main__":

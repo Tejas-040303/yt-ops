@@ -16,20 +16,20 @@ YouTube's inauthentic-content policy targets.
 
 **1 video published** (`0001-galileo-pisa-myth-bust`, Sep 7 2026).
 
-The back half of the pipeline is automated. The front half is not.
+The back half of the pipeline is one command. The front half is not.
 
 | Stage | State | Script |
 |---|---|---|
 | Topic selection | manual | — |
 | Research → sources → accounts → claims | manual | — |
 | Script writing | manual | — |
-| Storyboard (line → scene) | manual | — |
-| Scene generation | **8 of 8 scenes built** | `scene_kit.py`, `scene_*.py`, `falling_bodies.py` |
-| Voice | automated | `make_vo.py` |
-| Captions | automated | `captions.py` |
-| SFX | automated | `make_sfx.py` |
-| Render | automated | `render.py` |
-| Metadata | automated | `metadata.py` |
+| Storyboard (line → scene) | manual, one yaml | `shots/NNNN.yaml` |
+| Voice | automated | `make.py` → kokoro |
+| Captions | automated | `make.py` → `captions.py` |
+| Scene generation | automated, 8 scenes | `make.py` → `scene_*.py` |
+| SFX placement | automated | `make.py` |
+| Render | automated | `make.py` → `render.py` |
+| Metadata | automated | `make.py` → `metadata.py` |
 | Upload | manual, deliberately | — |
 
 Upload stays manual. It removes the Google API compliance audit entirely,
@@ -63,18 +63,29 @@ Model files, not in git (~340 MB), from
 
 ## Making a video
 
+Write one storyboard, run one command:
+
 ```bash
-python make_vo.py            # script  -> vo.wav + vo.json (word timings)
-python captions.py           # vo.json -> captions.ass
-python scene_timeline.py     # -> clips/NN-timeline.mp4
-python falling_bodies.py     # -> clips/falling.mp4
-python make_sfx.py           # -> assets/knock.wav
-python render.py             # -> out/<code>.mp4
-python metadata.py           # -> out/<code>-metadata.txt
+python make.py shots/0002.yaml
 ```
 
-The two scene lines are video 1's. Every video runs the scenes its
-storyboard calls for — see the scene library below.
+Voice, captions, every scene, SFX placement, render and metadata. Out
+comes `out/<code>.mp4` and `out/<code>-metadata.txt`.
+
+```bash
+python make.py shots/0002.yaml --plan      # durations and cuts, renders nothing
+python make.py shots/0002.yaml --skip-vo   # reuse vo.wav, re-cut the picture
+```
+
+`--plan` is the one to run first: it reports whether every scene fits
+the line it sits under, before spending minutes on frames. `--skip-vo`
+is for the second pass onwards, because the TTS is the slow part and the
+narration rarely changes once it is right.
+
+Copy `shots/0001.yaml` and change the content. The schema is three
+blocks — `script`, `shots`, `metadata` — and the rules are enforced, not
+documented: every script line must be covered by exactly one shot, in
+order, or `make.py` refuses to run.
 
 Then upload manually and record the ID:
 
@@ -119,8 +130,10 @@ Hierarchy lives in foreign keys. Files get a flat readable code:
 | `config.yaml` | Channel rule, gates, voice, render settings. Single source of truth |
 | `schema.sql` | 12-table SQLite schema |
 | `init_db.py` | Builds `db.sqlite`, seeds the myth blacklist |
-| `make_vo.py` | Multi-segment TTS (Emma narrates, George quotes sources) → `vo.wav` + word timings |
+| `make_vo.py` | *(superseded by `make.py`)* Video 1's TTS with its script hardcoded |
 | `captions.py` | Word timings → styled `.ass`. Isolates long tokens so dates hold alone |
+| `make.py` | **The pipeline.** Storyboard → voice, captions, scenes, SFX, render, metadata |
+| `shots/NNNN.yaml` | One storyboard per video. The only file that changes between videos |
 | `scene_kit.py` | **Scene library core:** palette, easing, fonts, safe area, encode. Every scene imports it |
 | `scene_timeline.py` | `timeline()` — dates arriving on a line, with the gap that matters bracketed |
 | `falling_bodies.py` | `drop_test()` — two masses falling level, landing as one sound |
@@ -131,7 +144,7 @@ Hierarchy lives in foreign keys. Files get a flat readable code:
 | `scene_map_zoom.py` | `map_zoom()` — graticule zoom onto real coordinates, pin drop |
 | `scene_ramp.py` | `ramp()` — inclined plane, ticks landing at 1 : 3 : 5 : 7 |
 | `make_sfx.py` | Synthesises the impact sound. Original audio, no licence |
-| `render.py` | Shots → 1080×1920 30fps, burns captions, mixes voice + music + SFX |
+| `render.py` | Shots → 1080×1920 30fps, burns captions, mixes voice + music + SFX. Takes a storyboard's shots, or its own |
 | `metadata.py` | Title options + structured description + attributions from DB |
 | `log_assets.py` | *(legacy)* Fetches Commons licences, logs to DB. Obsolete once fully animated |
 
@@ -217,18 +230,29 @@ has to say to drive them — which arguments really vary between videos and
 which never do. Videos 2–5 answer that by composing them by hand. Add a
 scene when a script needs one that does not exist, not before.
 
-### Video 5: automate the back half — `make.py`
+### ~~Video 5~~ done: the back half is `make.py`
 
 ```bash
-python make.py --script script.txt --storyboard shots.yaml
+python make.py shots/0002.yaml
 ```
 
-You write the script and choose scenes. Everything after is one command.
-**Biggest single win, arrives soonest** — per-video time drops from about
-an hour to fifteen minutes.
+You write the script and choose the scenes. Everything after is one
+command. Per-video time drops from about an hour to the time it takes to
+write the storyboard.
 
-Needs: scene registry, `shots.yaml` schema, `render.py` reading a
-storyboard instead of a hardcoded `SHOTS` list.
+This arrived at video 1 rather than video 5, against the five-times
+rule, and that was the right call: the back half is ffmpeg orchestration
+that video 1 already proved. Four more videos of running it by hand
+would have taught nothing about how to run ffmpeg — only about which
+scenes a script wants, which is the *next* stage and still waiting.
+
+Two things make the cuts exact rather than eyeballed. Each script line
+is synthesised as its own TTS segment, so the voiceover reports where
+every line starts and ends — no transcript matching. And every scene can
+be measured before it is drawn (`scene_kit.measuring`), so the slack
+parameter is solved rather than tuned. Both exist because `render.py`
+loops a clip that is too short and truncates one that is too long,
+silently: nothing else would catch it.
 
 ### Video 15: auto-storyboard
 
@@ -276,8 +300,6 @@ patterns over 100+ videos.
   from 1.2s to 2.0s.
 - `08-two-new-sciences-titlepage` was never found. The 1586-vs-1638 beat
   has no visual. Moot once fully animated.
-- `render.py` has a hardcoded `SHOTS` list. Moves to `shots.yaml` at the
-  `make.py` step.
 - **The two oldest scenes draw below the safe area.** `scene_timeline.py`
   runs to y=1560 and `falling_bodies.py` puts its `ONE SOUND` payoff at
   y=1690. Captions occupy y=1388–1498 and YouTube's UI covers everything

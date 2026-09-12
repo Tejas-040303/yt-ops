@@ -29,9 +29,15 @@ GAP_DRAW = 0.9        # seconds to draw the gap bracket
 GAP_HOLD = 1.2        # hold after the gap is labelled
 
 
-def timeline(events, gap=None, gap_label="", out="clips/timeline.mp4",
-             frames_dir="tmp_timeline"):
-    """events: list of (year, label). gap: (year_from, year_to) to highlight."""
+def timeline(events, gap=None, gap_label="", pace=1.0, hold=None,
+             out="clips/timeline.mp4", frames_dir="tmp_timeline"):
+    """events: list of (year, label). gap: (year_from, year_to) to highlight.
+
+    pace stretches how long each date takes to arrive, and hold is the
+    beat after the gap is labelled. Both exist because the narration is
+    the master clock: a scene is cut to its line, not the other way
+    round. Defaults reproduce the original timing exactly.
+    """
     if len(events) < 2:
         raise ValueError("need at least two events")
 
@@ -67,9 +73,11 @@ def timeline(events, gap=None, gap_label="", out="clips/timeline.mp4",
     f_label = load_font(42)
     f_gap = load_font(58)
 
-    per_event = ENTRY + HOLD
+    entry = ENTRY * pace
+    per_event = (ENTRY + HOLD) * pace
     t_events = len(events) * per_event
-    t_gap = (GAP_DRAW + GAP_HOLD) if gap else 0.6
+    tail = (GAP_HOLD if gap else 0.6) if hold is None else hold
+    t_gap = (GAP_DRAW + tail) if gap else tail
     total = t_events + t_gap
 
     def draw(t):
@@ -84,7 +92,7 @@ def timeline(events, gap=None, gap_label="", out="clips/timeline.mp4",
             start = idx * per_event
             if t < start:
                 continue
-            a = ease((t - start) / ENTRY)
+            a = ease((t - start) / entry)
             y = ypos[year]
 
             # slide in from the left while fading up
