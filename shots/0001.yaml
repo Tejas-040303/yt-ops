@@ -1,0 +1,167 @@
+# Storyboard for video 1. Copy this file, change the content, run it:
+#
+#     python make.py shots/0002.yaml
+#
+# Rules make.py enforces:
+#   - every script line is covered by exactly one shot, in order
+#   - each shot is stretched to fill exactly the time its lines are spoken
+#   - a scene that cannot fit its beat is reported, not silently cropped
+
+code: 0001-galileo-pisa-myth-bust
+
+voice:
+  narrator: bf_emma          # locked; see config.yaml
+  quote: bm_george           # source quotations only
+  speed: 1.05
+
+# One line per sentence-group. gap is the silence AFTER the line, and
+# the shot covering that line holds through it -- so a gap is breathing
+# room in the picture as well as the audio.
+script:
+  - text: >-
+      Everyone knows Galileo dropped two balls off the Leaning Tower of Pisa.
+    gap: 0.0
+
+  - text: >-
+      One person wrote that down. Vincenzo Viviani, his assistant.
+      He wrote it in 1654. Viviani was born in 1622. Galileo had been
+      dead twelve years.
+    gap: 0.0
+
+  - text: "No letter. No witness. No other record."
+    gap: 0.7
+
+  - text: "But somebody did do it. Delft, 1586."
+    gap: 0.0
+
+  - text: >-
+      Simon Stevin climbs a church tower with two lead balls.
+      One is ten times heavier.
+    gap: 0.0
+
+  - text: >-
+      He drops them thirty feet onto a board. He doesn't watch them.
+      He listens.
+    gap: 1.2                 # the silence the clap lands in
+
+  - voice: quote
+    text: "Their two sounds seem to be a single clap."
+    gap: 0.6
+
+  - text: "Fifty-two years before Galileo published his own version."
+    gap: 0.0
+
+  - text: "Stevin wrote in Dutch. Galileo wrote to be read."
+    gap: 0.0
+
+shots:
+  - scene: text_beat
+    lines: [0]
+    args:
+      text: "The Leaning Tower of Pisa."
+      kicker: "the story everyone knows"
+
+  # The spine of the video: four dates, and the twelve years between the
+  # last two are the argument. pace is set by hand because this line is
+  # long -- without it the dates would all land in the first 3 seconds
+  # and then sit there.
+  - scene: timeline
+    lines: [1]
+    args:
+      pace: 2.4
+      gap: [1642, 1654]
+      gap_label: "12 years"
+      events:
+        - [1564, "Galileo born"]
+        - [1622, "Viviani born"]
+        - [1642, "Galileo dies"]
+        - [1654, "the story written"]
+
+  - scene: text_beat
+    lines: [2]
+    args:
+      text: "No letter. No witness. No other record."
+      hot: "record"
+
+  - scene: map_zoom
+    lines: [3]
+    args:
+      target: [52.0116, 4.3571]
+      pin_label: "Delft, 1586"
+      per_step: 0.9
+      steps:
+        - ["EUROPE", 22]
+        - ["THE NETHERLANDS", 3.2]
+        - ["DELFT", 0.22]
+
+  - scene: number_reveal
+    lines: [4]
+    args:
+      value: 10
+      label: "times heavier"
+      sub: "two lead balls, dropped together"
+      count_time: 1.1
+
+  # Slack goes into hold_before so the impact lands late in the beat --
+  # in the silence after "he listens", which is where the clap belongs.
+  # It must never go into fall_time: 30 ft is a 1.4s fall, and stretching
+  # that turns a diagram that claims to be physics into one that is not.
+  - scene: drop_test
+    lines: [5]
+    slack: hold_before
+    sfx:
+      file: assets/knock.wav
+      gain: -3
+    args:
+      ratio: 10
+      height_label: "30 ft"
+      payoff: "ONE SOUND"
+      fall_time: 1.4
+      hold_after: 0.8
+
+  - scene: quote_card
+    lines: [6]
+    args:
+      text: "Their two sounds seem to be a single clap."
+      who: "Simon Stevin"
+      source: "De Beghinselen der Weeghconst, 1586"
+      per_line: 0.5
+
+  - scene: number_reveal
+    lines: [7]
+    args:
+      value: 52
+      label: "years earlier"
+      sub: "Stevin 1586, Galileo 1638"
+      count_time: 0.9
+
+  # No winner. The line explains why Galileo is the famous one; it does
+  # not call him wrong, so the scene does not hand anyone a verdict.
+  - scene: versus
+    lines: [8]
+    args:
+      left: ["STEVIN", ["wrote in Dutch"]]
+      right: ["GALILEO", ["wrote to be read"]]
+
+metadata:
+  video_id: 1
+  hook: >-
+    The Leaning Tower story comes from one man, writing in 1654, twelve
+    years after Galileo died. But the experiment did happen -- in Delft,
+    in 1586.
+  titles:
+    - "Galileo never did his most famous experiment"
+    - "The Pisa experiment has one source. He wasn't born yet."
+    - "Someone beat Galileo to it by 52 years"
+    - "The man who tested gravity before Galileo"
+    - "Why you've never heard of Simon Stevin"
+  sources:
+    - ["Stanford Encyclopedia of Philosophy: Galileo Galilei",
+       "https://plato.stanford.edu/entries/galileo/"]
+    - ["MacTutor: Simon Stevin",
+       "https://mathshistory.st-andrews.ac.uk/Biographies/Stevin/"]
+    - ["Linda Hall Library: Simon Stevin",
+       "https://www.lindahall.org/about/news/scientist-of-the-day/simon-stevin/"]
+    - ["Simon Stevin, De Beghinselen der Weeghconst (1586)",
+       "https://www.canonvanvlaanderen.be/en/events/simon-stevin/"]
+  hashtags: ["#history", "#science", "#galileo", "#physics", "#didyouknow"]

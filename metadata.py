@@ -49,8 +49,9 @@ SOURCES = [
 HASHTAGS = ["#history", "#science", "#galileo", "#physics", "#didyouknow"]
 
 
-def attributions():
+def attributions(video_id=None):
     """Required credit lines, straight from the asset manifest."""
+    video_id = VIDEO_ID if video_id is None else video_id
     if not os.path.exists(DB):
         return [], ["db.sqlite not found -- attributions NOT included"]
 
@@ -59,7 +60,7 @@ def attributions():
         rows = con.execute(
             "SELECT local_path, license, attribution_required, "
             "attribution_text, source_url, commercial_ok "
-            "FROM assets WHERE video_id = ?", (VIDEO_ID,)
+            "FROM assets WHERE video_id = ?", (video_id,)
         ).fetchall()
     except sqlite3.OperationalError as e:
         return [], [f"could not read assets table: {e}"]
@@ -67,7 +68,7 @@ def attributions():
         con.close()
 
     if not rows:
-        return [], [f"no assets logged for video_id={VIDEO_ID} "
+        return [], [f"no assets logged for video_id={video_id} "
                     f"-- run log_assets.py"]
 
     lines, warnings = [], []
@@ -84,14 +85,24 @@ def attributions():
     return lines, warnings
 
 
-def main():
-    os.makedirs(OUT_DIR, exist_ok=True)
-    credits, warnings = attributions()
+def main(code=None, titles=None, hook=None, sources=None, hashtags=None,
+         video_id=None, out_dir=None):
+    """Called bare it writes video 1's metadata; make.py passes a
+    storyboard's instead."""
+    code = CODE if code is None else code
+    titles = TITLES if titles is None else titles
+    hook = HOOK_LINE if hook is None else hook
+    sources = SOURCES if sources is None else sources
+    hashtags = HASHTAGS if hashtags is None else hashtags
+    out_dir = OUT_DIR if out_dir is None else out_dir
 
-    parts = [HOOK_LINE, ""]
+    os.makedirs(out_dir, exist_ok=True)
+    credits, warnings = attributions(video_id)
+
+    parts = [hook, ""]
 
     parts.append("Sources:")
-    for name, url in SOURCES:
+    for name, url in sources:
         parts.append(f"- {name}")
         parts.append(f"  {url}")
     parts.append("")
@@ -101,14 +112,14 @@ def main():
         parts += [f"- {c}" for c in credits]
         parts.append("")
 
-    parts.append(" ".join(HASHTAGS))
+    parts.append(" ".join(hashtags))
 
     description = "\n".join(parts)
 
-    out = os.path.join(OUT_DIR, f"{CODE}-metadata.txt")
+    out = os.path.join(out_dir, f"{code}-metadata.txt")
     with open(out, "w", encoding="utf-8") as f:
         f.write("=== TITLE OPTIONS (pick one) ===\n")
-        for i, t in enumerate(TITLES, 1):
+        for i, t in enumerate(titles, 1):
             f.write(f"{i}. [{len(t):>2} chars] {t}\n")
         f.write("\n=== DESCRIPTION ===\n")
         f.write(description)
@@ -119,15 +130,17 @@ def main():
         f.write("[ ] Schedule, do not publish immediately\n")
 
     print(f"wrote {out}")
-    print(f"  {len(TITLES)} titles, {len(SOURCES)} sources, "
+    print(f"  {len(titles)} titles, {len(sources)} sources, "
           f"{len(credits)} attributions")
 
-    over = [t for t in TITLES if len(t) > 60]
+    over = [t for t in titles if len(t) > 60]
     for t in over:
         print(f"  NOTE: title over 60 chars, will truncate on mobile: {t!r}")
 
     for w in warnings:
         print(f"  WARNING: {w}")
+
+    return out
 
 
 if __name__ == "__main__":
