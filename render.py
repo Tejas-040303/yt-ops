@@ -241,8 +241,15 @@ def main(shots=None, code=None, sfx=None, music=_UNSET, music_db=None,
     final = os.path.join(out_dir, f"{code}.mp4")
 
     # ---- audio graph: voice + optional music bed + timed SFX ----
+    # apad must be bounded. Left open it produces an infinite stream,
+    # amix=duration=first then follows it forever, and -shortest does not
+    # terminate a filtergraph: ffmpeg encodes the whole picture, writes
+    # the frames, and then hangs before the moov atom -- leaving an mp4
+    # every player rejects as invalid. whole_dur ends the pad exactly
+    # where the picture ends.
     inputs = ["-i", silent, "-i", audio]
-    chains = ["[1:a]loudnorm=I=-14:TP=-1.5:LRA=11,apad[voice]"]
+    chains = [f"[1:a]loudnorm=I=-14:TP=-1.5:LRA=11,"
+              f"apad=whole_dur={total:.3f}[voice]"]
     mix_labels = ["[voice]"]
     idx = 2
 
