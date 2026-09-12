@@ -16,20 +16,23 @@ YouTube's inauthentic-content policy targets.
 
 **1 video published** (`0001-galileo-pisa-myth-bust`, Sep 7 2026).
 
-The back half of the pipeline is one command. The front half is not.
+One command makes a video from nothing. **The check that it is true is
+still yours**, and that is the one stage the roadmap below argues should
+stay that way.
 
 | Stage | State | Script |
 |---|---|---|
-| Topic selection | manual | — |
-| Research → sources → accounts → claims | manual | — |
-| Script writing | manual | — |
-| Storyboard (line → scene) | manual, one yaml | `shots/NNNN.yaml` |
+| Topic selection | automated | `make.py --auto` → `brain.py` |
+| Research → sources → accounts → claims | automated, **unverified** | `auto.py` → `brain.py` |
+| Script writing | automated | `auto.py` → `brain.py` |
+| Storyboard (line → scene) | automated | `auto.py` → `shots/NNNN.yaml` |
 | Voice | automated | `make.py` → kokoro |
 | Captions | automated | `make.py` → `captions.py` |
 | Scene generation | automated, 8 scenes | `make.py` → `scene_*.py` |
 | SFX placement | automated | `make.py` |
 | Render | automated | `make.py` → `render.py` |
 | Metadata | automated | `make.py` → `metadata.py` |
+| **Checking the claims** | **manual, permanently** | `research/NNNN-notes.md` |
 | Upload | manual, deliberately | — |
 
 Upload stays manual. It removes the Google API compliance audit entirely,
@@ -48,6 +51,16 @@ pip install -r requirements.txt
 python init_db.py
 ```
 
+`make.py --auto` also needs an Anthropic API key, in the environment or
+in a `.env` next to `brain.py`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Nothing else in the pipeline needs it. A storyboard you wrote yourself
+renders without touching the API.
+
 System dependencies:
 
 - **ffmpeg** — must be built with `--enable-libass` (burns captions)
@@ -63,7 +76,20 @@ Model files, not in git (~340 MB), from
 
 ## Making a video
 
-Write one storyboard, run one command:
+From nothing:
+
+```bash
+python make.py --auto                              # it picks the subject
+python make.py --auto --topic "how we weighed the Earth"
+```
+
+It chooses a subject it has not covered, researches it against the
+allowed domains, writes the script, storyboards it and renders it. Then
+**read `research/NNNN-notes.md` before it ships** — particularly the
+section on what it could not establish. That file is the whole point of
+the design.
+
+From a storyboard you wrote:
 
 ```bash
 python make.py shots/0002.yaml
@@ -133,6 +159,9 @@ Hierarchy lives in foreign keys. Files get a flat readable code:
 | `make_vo.py` | *(superseded by `make.py`)* Video 1's TTS with its script hardcoded |
 | `captions.py` | Word timings → styled `.ass`. Isolates long tokens so dates hold alone |
 | `make.py` | **The pipeline.** Storyboard → voice, captions, scenes, SFX, render, metadata |
+| `brain.py` | The Claude API calls: pick a subject, research it, write it, storyboard it |
+| `auto.py` | Runs those four, enforces the gates, writes the DB rows and the storyboard |
+| `research/` | Per-video audit trail: the raw notes and the claims with their quotes. Not in git |
 | `shots/NNNN.yaml` | One storyboard per video. The only file that changes between videos |
 | `scene_kit.py` | **Scene library core:** palette, easing, fonts, safe area, encode. Every scene imports it |
 | `scene_timeline.py` | `timeline()` — dates arriving on a line, with the gap that matters bracketed |
@@ -254,14 +283,19 @@ parameter is solved rather than tuned. Both exist because `render.py`
 loops a clip that is too short and truncates one that is too long,
 silently: nothing else would catch it.
 
-### Video 15: auto-storyboard
+### ~~Video 15~~ done: auto-storyboard
 
-Rules, not AI. A date becomes `timeline`. A quote becomes `quote_card`. A
-comparison becomes `versus`. Derived from patterns across ~10 videos.
+Not rules in the end — the model picks the scene per line, from a
+catalogue generated out of the scene functions' own signatures, so it
+cannot invent a scene or an argument that does not exist. `make.py`
+then solves every duration, and compresses a scene's pacing when its
+content runs longer than the line it sits under.
 
-### Video 25+: research assistance — *not* research automation
+### Built early: research assistance — *not* verified research
 
-**This stage stays human-in-the-loop, possibly permanently.**
+**The verification stays human-in-the-loop, permanently.** What is
+built is the drafting. What is not built, and should not be, is anything
+that marks a claim true.
 
 The niche is myth-dense. An LLM asked to research Galileo and the Tower of
 Pisa produces the myth, confidently, citing blogs that repeat it. During
@@ -272,9 +306,24 @@ into a script unchecked. Two humans and it still got through.
 Automating that step means shipping fabrications at 60/month on a channel
 whose entire premise is that it checks things.
 
-The realistic version: the machine finds candidate sources and drafts; a
-human verifies claims against them and approves. ~20 minutes per video,
-and it is the 20 minutes that makes the channel worth watching.
+The realistic version, and the one that is built: the machine finds
+candidate sources and drafts; a human verifies claims against them and
+approves. Two things make that check small rather than a research
+session of its own.
+
+The search is **domain-locked**. `sources.preferred_domains` is handed
+to the web search tool as `allowed_domains`, so a blog repeating the
+myth is not discouraged, it is unreachable.
+
+Every claim must carry a **verbatim quote** from one of those pages.
+A claim that cannot produce one is dropped before the script sees it,
+and the quotes land in `claim_sources.quote` — which is what that
+column was always for.
+
+So claims are written to the database as `probable`, never `verified`.
+A quote was produced; nobody has yet confirmed it says what the claim
+says it says. Moving a row to `verified` is a human action and there is
+deliberately no code that does it.
 
 ### Then: analytics loop
 

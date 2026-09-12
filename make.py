@@ -5,6 +5,9 @@ One command from storyboard to uploadable video.
     python make.py shots/0001.yaml --skip-vo     # reuse vo.wav + vo.json
     python make.py shots/0001.yaml --plan        # print the plan, render nothing
 
+    python make.py --auto                        # pick a subject and make it
+    python make.py --auto --topic "how we weighed the Earth"
+
 The storyboard is the entire input. Nothing gets edited per video any
 more: what used to live in make_vo.py's SEGMENTS, render.py's SHOTS and
 metadata.py's constants now comes out of one yaml file.
@@ -46,23 +49,30 @@ from scene_text_beat import text_beat
 from scene_timeline import timeline
 from scene_versus import versus
 
-# name in yaml -> (function, the parameter that absorbs slack)
+# name in yaml -> (function, slack parameter, squeeze parameter or None)
 #
 # Every scene ends on a held frame, and that hold is what gets stretched
 # to fill a beat. drop_test is the exception: its slack normally goes
 # after the impact, but a shot can say `slack: hold_before` to push the
-# impact later instead, which is how you land a sound on a specific
-# word.
+# impact later instead, which is how you land a sound on a specific word.
+#
+# The squeeze parameter is the opposite case -- a scene whose content
+# makes it longer than its line even with no hold at all (a three-step
+# map zoom under a three-second sentence). Compressing that parameter
+# fits it. drop_test deliberately has none: the only thing left to
+# compress there is fall_time, and that is real physics.
 SCENES = {
-    "text_beat":     (text_beat, "hold"),
-    "timeline":      (timeline, "hold"),
-    "drop_test":     (drop_test, "hold_after"),
-    "number_reveal": (number_reveal, "hold"),
-    "quote_card":    (quote_card, "hold"),
-    "versus":        (versus, "hold"),
-    "map_zoom":      (map_zoom, "hold"),
-    "ramp":          (ramp, "hold"),
+    "text_beat":     (text_beat, "hold", "per_word"),
+    "timeline":      (timeline, "hold", "pace"),
+    "drop_test":     (drop_test, "hold_after", None),
+    "number_reveal": (number_reveal, "hold", "count_time"),
+    "quote_card":    (quote_card, "hold", "per_line"),
+    "versus":        (versus, "hold", None),
+    "map_zoom":      (map_zoom, "hold", "per_step"),
+    "ramp":          (ramp, "hold", "roll"),
 }
+
+SQUEEZE_FLOOR = 0.3        # never compress a pacing value below this
 
 # Scenes with a moment a sound has to hit, as an offset into the clip.
 IMPACT = {
@@ -202,7 +212,7 @@ def build_shots(board, spans, plan_only=False):
 
     for i, (shot, (start, end)) in enumerate(zip(board["shots"], spans)):
         name = shot["scene"]
-        fn, default_slack = SCENES[name]
+        fn, default_slack, squeeze_kw = SCENES[name]
         slack_kw = shot.get("slack", default_slack)
         if slack_kw not in inspect.signature(fn).parameters:
             die(f"shot {i}: {name}() has no parameter {slack_kw!r}")
@@ -213,8 +223,29 @@ def build_shots(board, spans, plan_only=False):
 
         # Measure at zero slack, then solve. Every scene's duration is
         # linear in its slack parameter, so one probe is enough.
-        with measuring():
-            floor = fn(**{**args, slack_kw: 0.0}, out=clip)
+        def measure(a):
+            with measuring():
+                return fn(**{**a, slack_kw: 0.0}, out=clip)
+
+        floor = measure(args)
+
+        # Too long for its line even with no hold: compress the pacing
+        # parameter instead of cropping. Duration is linear in it, so two
+        # probes give the exact value -- no search.
+        if floor > beat + 0.02 and squeeze_kw and squeeze_kw not in args:
+            p0 = resolved(fn, args)[squeeze_kw]
+            p1 = p0 * 0.5
+            d1 = measure({**args, squeeze_kw: p1})
+            slope = (floor - d1) / (p0 - p1) if p0 != p1 else 0
+            if slope > 0:
+                want = max(SQUEEZE_FLOOR, p1 + (beat - d1) / slope)
+                args[squeeze_kw] = round(want, 3)
+                floor = measure(args)
+                if floor <= beat + 0.02:
+                    report.append(
+                        f"     {name}: {squeeze_kw} {p0:.2f} -> {want:.2f} "
+                        f"to fit a {beat:.2f}s line")
+
         args[slack_kw] = max(0.0, round(beat - floor, 3))
 
         if floor > beat + 0.05:
@@ -249,12 +280,29 @@ def build_shots(board, spans, plan_only=False):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    ap.add_argument("storyboard")
+    ap.add_argument("storyboard", nargs="?",
+                    help="path to a storyboard yaml; omit with --auto")
+    ap.add_argument("--auto", action="store_true",
+                    help="research and write a new storyboard first "
+                         "(needs ANTHROPIC_API_KEY)")
+    ap.add_argument("--topic", help="with --auto: the subject to research, "
+                                    "instead of letting it choose")
     ap.add_argument("--skip-vo", action="store_true",
                     help="reuse the existing vo.wav and vo.json")
     ap.add_argument("--plan", action="store_true",
                     help="print the shot plan and stop, rendering nothing")
     a = ap.parse_args(argv)
+
+    if a.auto:
+        if a.storyboard:
+            die("pass a storyboard or --auto, not both")
+        import auto
+        a.storyboard = auto.main(["--topic", a.topic] if a.topic else [])
+        print("\n" + "=" * 60)
+    elif not a.storyboard:
+        die("give me a storyboard (shots/NNNN.yaml) or --auto")
+    elif a.topic:
+        die("--topic only means something with --auto")
 
     board = load(a.storyboard)
     code = board["code"]
