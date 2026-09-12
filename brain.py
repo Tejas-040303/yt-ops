@@ -271,6 +271,7 @@ SCRIPT_SCHEMA = {
         "angle": {"type": "string",
                   "enum": ["myth_bust", "origin", "mechanism", "person",
                            "consequence", "unknown_still"]},
+        "person": {"type": "string"},
         "hook": {"type": "string"},
         "lines": {
             "type": "array",
@@ -289,7 +290,8 @@ SCRIPT_SCHEMA = {
         "titles": {"type": "array", "items": {"type": "string"}},
         "description_hook": {"type": "string"},
     },
-    "required": ["angle", "hook", "lines", "titles", "description_hook"],
+    "required": ["angle", "person", "hook", "lines", "titles",
+                 "description_hook"],
     "additionalProperties": False,
 }
 
@@ -302,7 +304,8 @@ def write_script(topic, claims, myths, limits):
             "were actually made. Not what is true -- how we came to know it.\n\n"
             "Hard rules:\n"
             f"- {lo}-{hi} words total.\n"
-            "- Name a person. Name a place or a year.\n"
+            "- Name a person, and return that name in `person`, spelled "
+            "exactly as the script spells it. Name a place or a year.\n"
             "- Every factual statement must come from the claims you are "
             "given. You may not add a number, a date or a name that is not "
             "in them. If a line needs a fact you do not have, cut the line.\n"

@@ -32,7 +32,6 @@ import json
 import os
 import re
 import sqlite3
-import sys
 
 import yaml
 
@@ -110,10 +109,15 @@ def check(script, person, cfg, con):
     if not lo <= words <= hi:
         fails.append(f"{words} words, outside the {lo}-{hi} range")
 
-    surname = person.split()[-1] if person else ""
+    # The script declares who it names, so this gate works whether the
+    # subject came from pick_topic or from --topic, which carries no
+    # person at all.
+    named = (script.get("person") or person or "").strip()
+    surname = named.split()[-1] if named else ""
     has_person = bool(surname) and surname.lower() in body.lower()
     if cfg["gates"]["must_name_person"] and not has_person:
-        fails.append(f"never names {person}")
+        fails.append("names nobody"
+                     if not named else f"never says {named} in the script")
 
     has_year = bool(re.search(r"\b(1\d{3}|20\d{2})\b", body))
     if cfg["gates"]["must_name_place_or_year"] and not has_year:
@@ -305,4 +309,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(0 if main() else 0)
+    main()
