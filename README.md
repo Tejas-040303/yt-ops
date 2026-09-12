@@ -268,9 +268,9 @@ patterns over 100+ videos.
 
 ## Known issues
 
-- **~5s of dead air** at the end of video 1 (`TAIL_SEC` was 2.8). Set to
-  0.4. Shorts loop — dead air at the end breaks the loop instead of
-  sending viewers round again.
+- **~5s of dead air** at the end of video 1 (`TAIL_SEC` was 2.8). Now
+  0.8 in `render.py`. Shorts loop — dead air at the end breaks the loop
+  instead of sending viewers round again.
 - **No real silence anywhere.** Audio never drops below RMS 0.06, so the
   clap payoff has nothing to land against. Widen the gap in `make_vo.py`
   from 1.2s to 2.0s.
