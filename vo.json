@@ -1,0 +1,564 @@
+{
+  "timeline": [
+    {
+      "seg": 0,
+      "voice": "bf_emma",
+      "start": 0.0,
+      "end": 18.07,
+      "text": "Everyone knows Galileo dropped two balls off the Leaning Tower of Pisa. One person wrote that down. Vincenzo Viviani, his assistant. He wrote it in 1654. Viviani was born in 1622. Galileo had been dead twelve years. No letter. No witness. No other record."
+    },
+    {
+      "seg": 1,
+      "voice": "bf_emma",
+      "start": 18.77,
+      "end": 31.38,
+      "text": "But somebody did do it. Delft, 1586. Simon Stevin climbs a church tower with two lead balls. One is ten times heavier. He drops them thirty feet onto a board. He doesn't watch them. He listens."
+    },
+    {
+      "seg": 2,
+      "voice": "bm_george",
+      "start": 32.58,
+      "end": 35.46,
+      "text": "Their two sounds seem to be a single clap."
+    },
+    {
+      "seg": 3,
+      "voice": "bf_emma",
+      "start": 36.06,
+      "end": 42.41,
+      "text": "Fifty-two years before Galileo published his own version. Stevin wrote in Dutch. Galileo wrote to be read."
+    }
+  ],
+  "words": [
+    {
+      "w": "Everyone",
+      "start": 0.0,
+      "end": 0.26
+    },
+    {
+      "w": "knows",
+      "start": 0.26,
+      "end": 0.56
+    },
+    {
+      "w": "Galileo",
+      "start": 0.56,
+      "end": 0.86
+    },
+    {
+      "w": "dropped",
+      "start": 0.86,
+      "end": 1.34
+    },
+    {
+      "w": "two",
+      "start": 1.34,
+      "end": 1.68
+    },
+    {
+      "w": "balls",
+      "start": 1.68,
+      "end": 1.9
+    },
+    {
+      "w": "off",
+      "start": 1.9,
+      "end": 2.1
+    },
+    {
+      "w": "the",
+      "start": 2.1,
+      "end": 2.26
+    },
+    {
+      "w": "Leaning",
+      "start": 2.26,
+      "end": 2.48
+    },
+    {
+      "w": "Tower",
+      "start": 2.48,
+      "end": 2.72
+    },
+    {
+      "w": "of",
+      "start": 2.72,
+      "end": 2.96
+    },
+    {
+      "w": "Pisa.",
+      "start": 2.96,
+      "end": 3.28
+    },
+    {
+      "w": "One",
+      "start": 4.04,
+      "end": 4.18
+    },
+    {
+      "w": "person",
+      "start": 4.18,
+      "end": 4.48
+    },
+    {
+      "w": "wrote",
+      "start": 4.48,
+      "end": 4.76
+    },
+    {
+      "w": "that",
+      "start": 4.76,
+      "end": 5.04
+    },
+    {
+      "w": "down,",
+      "start": 5.04,
+      "end": 5.3
+    },
+    {
+      "w": "Vincenzo",
+      "start": 5.76,
+      "end": 6.32
+    },
+    {
+      "w": "Viviani",
+      "start": 6.32,
+      "end": 6.7
+    },
+    {
+      "w": "his",
+      "start": 6.7,
+      "end": 6.94
+    },
+    {
+      "w": "assistant,",
+      "start": 6.94,
+      "end": 7.22
+    },
+    {
+      "w": "he",
+      "start": 7.88,
+      "end": 7.94
+    },
+    {
+      "w": "wrote",
+      "start": 7.94,
+      "end": 8.1
+    },
+    {
+      "w": "it",
+      "start": 8.1,
+      "end": 8.28
+    },
+    {
+      "w": "in",
+      "start": 8.28,
+      "end": 8.42
+    },
+    {
+      "w": "1654,",
+      "start": 8.42,
+      "end": 9.76
+    },
+    {
+      "w": "Viviani",
+      "start": 10.32,
+      "end": 10.78
+    },
+    {
+      "w": "was",
+      "start": 10.78,
+      "end": 10.98
+    },
+    {
+      "w": "born",
+      "start": 10.98,
+      "end": 11.2
+    },
+    {
+      "w": "in",
+      "start": 11.2,
+      "end": 11.36
+    },
+    {
+      "w": "1622,",
+      "start": 11.36,
+      "end": 12.92
+    },
+    {
+      "w": "Galileo",
+      "start": 13.38,
+      "end": 13.7
+    },
+    {
+      "w": "had",
+      "start": 13.7,
+      "end": 14.16
+    },
+    {
+      "w": "been",
+      "start": 14.16,
+      "end": 14.3
+    },
+    {
+      "w": "dead",
+      "start": 14.3,
+      "end": 14.46
+    },
+    {
+      "w": "12",
+      "start": 14.46,
+      "end": 14.74
+    },
+    {
+      "w": "years,",
+      "start": 14.74,
+      "end": 15.04
+    },
+    {
+      "w": "no",
+      "start": 15.56,
+      "end": 15.7
+    },
+    {
+      "w": "letter,",
+      "start": 15.7,
+      "end": 15.9
+    },
+    {
+      "w": "no",
+      "start": 16.36,
+      "end": 16.46
+    },
+    {
+      "w": "witness,",
+      "start": 16.46,
+      "end": 16.7
+    },
+    {
+      "w": "no",
+      "start": 17.18,
+      "end": 17.3
+    },
+    {
+      "w": "other",
+      "start": 17.3,
+      "end": 17.46
+    },
+    {
+      "w": "record.",
+      "start": 17.46,
+      "end": 17.78
+    },
+    {
+      "w": "But",
+      "start": 18.7,
+      "end": 18.84
+    },
+    {
+      "w": "somebody",
+      "start": 18.84,
+      "end": 19.06
+    },
+    {
+      "w": "did",
+      "start": 19.06,
+      "end": 19.4
+    },
+    {
+      "w": "do",
+      "start": 19.4,
+      "end": 19.62
+    },
+    {
+      "w": "it,",
+      "start": 19.62,
+      "end": 19.72
+    },
+    {
+      "w": "Delft",
+      "start": 20.36,
+      "end": 20.58
+    },
+    {
+      "w": "1586.",
+      "start": 20.58,
+      "end": 21.98
+    },
+    {
+      "w": "Simon",
+      "start": 22.86,
+      "end": 23.2
+    },
+    {
+      "w": "Steven",
+      "start": 23.2,
+      "end": 23.54
+    },
+    {
+      "w": "climbs",
+      "start": 23.54,
+      "end": 23.78
+    },
+    {
+      "w": "a",
+      "start": 23.78,
+      "end": 24.04
+    },
+    {
+      "w": "church",
+      "start": 24.04,
+      "end": 24.18
+    },
+    {
+      "w": "tower",
+      "start": 24.18,
+      "end": 24.5
+    },
+    {
+      "w": "with",
+      "start": 24.5,
+      "end": 24.74
+    },
+    {
+      "w": "two",
+      "start": 24.74,
+      "end": 24.92
+    },
+    {
+      "w": "lead",
+      "start": 24.92,
+      "end": 25.1
+    },
+    {
+      "w": "balls,",
+      "start": 25.1,
+      "end": 25.38
+    },
+    {
+      "w": "one",
+      "start": 25.98,
+      "end": 26.02
+    },
+    {
+      "w": "is",
+      "start": 26.02,
+      "end": 26.14
+    },
+    {
+      "w": "ten",
+      "start": 26.14,
+      "end": 26.34
+    },
+    {
+      "w": "times",
+      "start": 26.34,
+      "end": 26.64
+    },
+    {
+      "w": "heavier,",
+      "start": 26.64,
+      "end": 26.98
+    },
+    {
+      "w": "he",
+      "start": 27.58,
+      "end": 27.68
+    },
+    {
+      "w": "drops",
+      "start": 27.68,
+      "end": 27.82
+    },
+    {
+      "w": "them",
+      "start": 27.82,
+      "end": 28.08
+    },
+    {
+      "w": "30",
+      "start": 28.08,
+      "end": 28.28
+    },
+    {
+      "w": "feet",
+      "start": 28.28,
+      "end": 28.6
+    },
+    {
+      "w": "onto",
+      "start": 28.6,
+      "end": 28.76
+    },
+    {
+      "w": "a",
+      "start": 28.76,
+      "end": 28.94
+    },
+    {
+      "w": "board,",
+      "start": 28.94,
+      "end": 29.14
+    },
+    {
+      "w": "he",
+      "start": 29.42,
+      "end": 29.48
+    },
+    {
+      "w": "doesn't",
+      "start": 29.48,
+      "end": 29.72
+    },
+    {
+      "w": "watch",
+      "start": 29.72,
+      "end": 29.9
+    },
+    {
+      "w": "them,",
+      "start": 29.9,
+      "end": 30.26
+    },
+    {
+      "w": "he",
+      "start": 30.58,
+      "end": 30.78
+    },
+    {
+      "w": "listens.",
+      "start": 30.78,
+      "end": 31.02
+    },
+    {
+      "w": "Their",
+      "start": 32.14,
+      "end": 32.68
+    },
+    {
+      "w": "two",
+      "start": 32.68,
+      "end": 32.88
+    },
+    {
+      "w": "sounds",
+      "start": 32.88,
+      "end": 33.3
+    },
+    {
+      "w": "seem",
+      "start": 33.3,
+      "end": 33.92
+    },
+    {
+      "w": "to",
+      "start": 33.92,
+      "end": 34.16
+    },
+    {
+      "w": "be",
+      "start": 34.16,
+      "end": 34.3
+    },
+    {
+      "w": "a",
+      "start": 34.3,
+      "end": 34.42
+    },
+    {
+      "w": "single",
+      "start": 34.42,
+      "end": 34.66
+    },
+    {
+      "w": "clap.",
+      "start": 34.66,
+      "end": 35.3
+    },
+    {
+      "w": "52",
+      "start": 35.84,
+      "end": 36.34
+    },
+    {
+      "w": "years",
+      "start": 36.34,
+      "end": 36.72
+    },
+    {
+      "w": "before",
+      "start": 36.72,
+      "end": 37.1
+    },
+    {
+      "w": "Galileo",
+      "start": 37.1,
+      "end": 37.34
+    },
+    {
+      "w": "published",
+      "start": 37.34,
+      "end": 38.0
+    },
+    {
+      "w": "his",
+      "start": 38.0,
+      "end": 38.24
+    },
+    {
+      "w": "own",
+      "start": 38.24,
+      "end": 38.4
+    },
+    {
+      "w": "version,",
+      "start": 38.4,
+      "end": 38.74
+    },
+    {
+      "w": "Steven",
+      "start": 39.32,
+      "end": 39.62
+    },
+    {
+      "w": "wrote",
+      "start": 39.62,
+      "end": 39.82
+    },
+    {
+      "w": "in",
+      "start": 39.82,
+      "end": 40.1
+    },
+    {
+      "w": "Dutch,",
+      "start": 40.1,
+      "end": 40.34
+    },
+    {
+      "w": "Galileo",
+      "start": 41.12,
+      "end": 41.12
+    },
+    {
+      "w": "wrote",
+      "start": 41.12,
+      "end": 41.64
+    },
+    {
+      "w": "to",
+      "start": 41.64,
+      "end": 41.86
+    },
+    {
+      "w": "be",
+      "start": 41.86,
+      "end": 41.96
+    },
+    {
+      "w": "read.",
+      "start": 41.96,
+      "end": 42.14
+    }
+  ]
+}

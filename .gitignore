@@ -1,28 +1,15 @@
-# secrets
+.venv/
+__pycache__/
 .env
 client_secret.json
 token.json
-
-# models (340 MB - download separately)
 *.onnx
 *.bin
-
-# generated
-.venv/
-__pycache__/
 db.sqlite
 out/
-*.wav
-test*.wav
-vo.json
-
-# assets - licensed images, keep local
+clips/
 assets/
-
-# os
-Thumbs.db
-desktop.
-
+tmp_*/
+*.wav
 *.mp4
-test*.wav
-voice/
+*.ass
