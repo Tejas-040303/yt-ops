@@ -24,7 +24,7 @@ The back half of the pipeline is automated. The front half is not.
 | Research → sources → accounts → claims | manual | — |
 | Script writing | manual | — |
 | Storyboard (line → scene) | manual | — |
-| Scene generation | **1 of ~8 scenes built** | `scene_timeline.py`, `falling_bodies.py` |
+| Scene generation | **8 of 8 scenes built** | `scene_kit.py`, `scene_*.py`, `falling_bodies.py` |
 | Voice | automated | `make_vo.py` |
 | Captions | automated | `captions.py` |
 | SFX | automated | `make_sfx.py` |
@@ -73,6 +73,9 @@ python render.py             # -> out/<code>.mp4
 python metadata.py           # -> out/<code>-metadata.txt
 ```
 
+The two scene lines are video 1's. Every video runs the scenes its
+storyboard calls for — see the scene library below.
+
 Then upload manually and record the ID:
 
 ```bash
@@ -118,8 +121,15 @@ Hierarchy lives in foreign keys. Files get a flat readable code:
 | `init_db.py` | Builds `db.sqlite`, seeds the myth blacklist |
 | `make_vo.py` | Multi-segment TTS (Emma narrates, George quotes sources) → `vo.wav` + word timings |
 | `captions.py` | Word timings → styled `.ass`. Isolates long tokens so dates hold alone |
-| `scene_timeline.py` | **Scene library:** animated dates with gap highlighting |
-| `falling_bodies.py` | **Scene library:** physics animation, two masses falling |
+| `scene_kit.py` | **Scene library core:** palette, easing, fonts, safe area, encode. Every scene imports it |
+| `scene_timeline.py` | `timeline()` — dates arriving on a line, with the gap that matters bracketed |
+| `falling_bodies.py` | `drop_test()` — two masses falling level, landing as one sound |
+| `scene_text_beat.py` | `text_beat()` — a statement landing word by word. The pattern break |
+| `scene_number_reveal.py` | `number_reveal()` — a figure counting up, settling, labelled |
+| `scene_quote_card.py` | `quote_card()` — a primary source on screen with its work and year |
+| `scene_versus.py` | `versus()` — two accounts side by side, one dismissed |
+| `scene_map_zoom.py` | `map_zoom()` — graticule zoom onto real coordinates, pin drop |
+| `scene_ramp.py` | `ramp()` — inclined plane, ticks landing at 1 : 3 : 5 : 7 |
 | `make_sfx.py` | Synthesises the impact sound. Original audio, no licence |
 | `render.py` | Shots → 1080×1920 30fps, burns captions, mixes voice + music + SFX |
 | `metadata.py` | Title options + structured description + attributions from DB |
@@ -146,13 +156,24 @@ because you are building the library. Video 12 is a config file.
 | Scene | Status | Signature |
 |---|---|---|
 | `timeline()` | built | `timeline(events, gap, gap_label)` |
-| `drop_test()` | built | `falling_bodies.py` |
-| `text_beat()` | **todo** | full-frame statement, the pattern break |
-| `number_reveal()` | **todo** | a figure arriving with weight |
-| `quote_card()` | **todo** | primary source on screen, attributed |
-| `versus()` | **todo** | two things compared side by side |
-| `map_zoom()` | **todo** | continent → country → city, pin drops |
-| `ramp()` | **todo** | inclined plane, ticks as it accelerates |
+| `drop_test()` | built | `drop_test(ratio, height_label, payoff)` |
+| `text_beat()` | built | `text_beat(text, hot, kicker)` |
+| `number_reveal()` | built | `number_reveal(value, label, sub, prefix, suffix)` |
+| `quote_card()` | built | `quote_card(text, who, source)` |
+| `versus()` | built | `versus(left, right, winner, verdict)` |
+| `map_zoom()` | built | `map_zoom(target, steps, pin_label, outline)` |
+| `ramp()` | built | `ramp(angle, intervals, caption)` |
+
+Every scene takes its arguments and an `out=` path, renders frames with
+Pillow, hands them to ffmpeg and returns its duration in seconds — which
+is what `render.py` needs to place the next shot. Each file also renders
+its own example under `python <file>.py`, so a scene can be looked at
+without a script to put it in.
+
+`map_zoom()` draws a real graticule and a real scale bar rather than a
+picture of land: same rule as the drop test, a diagram and not a
+depiction, so it cannot be wrong about a coastline it never claims to
+show. Pass `outline=` if you have public-domain geometry to add.
 
 Built with Pillow, not Manim. Reasons: no heavy dependency chain, runs on
 CPU, deterministic output, and a hand-built look is more distinctive than
@@ -167,7 +188,17 @@ DIM  (120, 124, 132)   grey, for labels
 HOT  (255, 214, 122)   amber, for the one thing that matters
 ```
 
-Ease-out cubic on all motion. Nothing arrives linearly.
+Ease-out cubic on all motion. Nothing arrives linearly. Amber is a
+budget, not a colour: one idea per scene gets it.
+
+All of that lives in `scene_kit.py` — palette, easing, cached font
+loading, word wrap, letter-spaced labels, and the frames-to-mp4 step —
+so a new scene is only its drawing code, and the house style cannot
+drift one file at a time.
+
+`scene_kit.SAFE_BOTTOM` is the floor: captions.py burns cues at
+`MarginV` 22% of the height, and the line itself sits about 110px above
+that, so a scene has until y=1388 and no further.
 
 ---
 
@@ -179,10 +210,12 @@ from patterns that only appear once you have made things. The rule:
 when you know what actually varies between videos rather than what you
 assumed would vary.
 
-### Now → video 5: finish the scene library
+### Now → video 5: use the library, find what it is missing
 
-Each video needs a scene that does not exist yet. Build it, add it to the
-library, move on. By video 5 there should be 8–10 scenes.
+The eight scenes are built. What is not known yet is what a storyboard
+has to say to drive them — which arguments really vary between videos and
+which never do. Videos 2–5 answer that by composing them by hand. Add a
+scene when a script needs one that does not exist, not before.
 
 ### Video 5: automate the back half — `make.py`
 
@@ -245,6 +278,12 @@ patterns over 100+ videos.
   has no visual. Moot once fully animated.
 - `render.py` has a hardcoded `SHOTS` list. Moves to `shots.yaml` at the
   `make.py` step.
+- **The two oldest scenes draw below the safe area.** `scene_timeline.py`
+  runs to y=1560 and `falling_bodies.py` puts its `ONE SOUND` payoff at
+  y=1690. Captions occupy y=1388–1498 and YouTube's UI covers everything
+  under 1498, so in video 1 that payoff line is behind the UI. The six
+  newer scenes respect `scene_kit.SAFE_BOTTOM`; these two predate it.
+  Raising them recomposes both scenes, so it is a look decision.
 
 ---
 
