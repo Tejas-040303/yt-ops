@@ -263,15 +263,27 @@ def rank_titles(titles, names):
     return [r["title"] for r in rows]
 
 
-def leads_from_swipe(path, limit=8):
+def leads_from_swipe(path, per_channel=4):
+    """The best outliers from EACH channel, not the best overall.
+
+    Channels differ in how hit-driven they are, not just in size: on the
+    first real collection Veritasium's Shorts ran to 14.7x their median
+    and Kurzgesagt's topped out at 3.4x, so a plain top-8 was six
+    Veritasium. The multiple already corrects for size; this corrects
+    for spread."""
     if not os.path.exists(path):
         raise SystemExit(f"  --swipe {path}: no such file")
     rows, note = ytskill.swipe(path)
     if rows is None:
         print(f"  swipe skipped: {note}")
         return ""
-    top = rows["outliers"][:limit]
-    print(f"  {len(top)} outliers from {path}")
+    by = {}
+    for r in rows["outliers"]:                     # already best-first
+        by.setdefault(r["channel"], []).append(r)
+    top = sorted((r for rs in by.values() for r in rs[:per_channel]),
+                 key=lambda r: -r["multiple"])
+    print(f"  {len(top)} outliers from {path}: " + ", ".join(
+        f"{min(len(rs), per_channel)} {ch}" for ch, rs in by.items()))
     try:
         when = json.load(open(path, encoding="utf-8")).get("collected_at")
         age = (datetime.date.today()
@@ -281,8 +293,8 @@ def leads_from_swipe(path, limit=8):
                   f"collect_swipe.py for what is working now")
     except (AttributeError, TypeError, ValueError):
         pass   # a hand-made list with no collected_at
-    return "\n".join(f"- {r['multiple']}x its channel's median: "
-                     f"{r['title']} ({r['formula']})" for r in top)
+    return "\n".join(f"- {r['multiple']}x its channel's median "
+                     f"({r['channel']}): {r['title']}" for r in top)
 
 
 # --- persistence --------------------------------------------------
@@ -422,7 +434,9 @@ def main(argv=None):
         print(f"\ntopic (given)  {topic['title']}")
     else:
         print("\ntopic")
-        leads = leads_from_swipe(a.swipe) if a.swipe else ""
+        leads = (leads_from_swipe(
+            a.swipe, cfg.get("swipe", {}).get("leads_per_channel", 4))
+            if a.swipe else "")
         if lane_name == "trending":
             news = brain.scout(lane, lane["domains"], banned, today)
             open(os.path.join(RESEARCH_DIR, f"{seq:04d}-scout.md"), "w",
