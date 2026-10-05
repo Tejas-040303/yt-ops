@@ -8,15 +8,21 @@ reaches a script.
 
 Needs ANTHROPIC_API_KEY in the environment (or a .env next to this file).
 
-    from brain import pick_topic, research, extract, write_script, storyboard
+    from brain import scout, pick_topic, research, extract, write_script, storyboard
+
+Every prompt takes its lane from config.yaml (found_out, curiosity,
+trending): what the lane is for, which gates its script must pass, and
+the domains its research may reach. The lane changes the brief, never
+the discipline -- every lane is domain-locked and quote-backed.
 
 Why the search is domain-locked
 -------------------------------
-The niche is myth-dense. Asked to research Galileo and the Tower of
+Every lane is myth-dense. Asked to research Galileo and the Tower of
 Pisa, a model returns the myth, confidently, citing blogs that repeat
-it. config.yaml lists the domains that are allowed to be cited, and
-that list is handed to the server-side web_search tool as
-allowed_domains -- so a blog is not "discouraged", it is unreachable.
+it -- and general knowledge is worse than history for this. Each lane
+in config.yaml lists the domains it may cite, and that list is handed
+to the server-side web_search tool as allowed_domains -- so a blog is
+not "discouraged", it is unreachable.
 Every claim must then carry a verbatim quote from one of those pages,
 and a claim that cannot produce one does not survive extract().
 """
@@ -135,7 +141,7 @@ def _ask(system, prompt, schema=None, tools=None, effort="high",
     return body
 
 
-# --- the four steps ----------------------------------------------
+# --- the steps ---------------------------------------------------
 
 TOPIC_SCHEMA = {
     "type": "object",
@@ -151,28 +157,53 @@ TOPIC_SCHEMA = {
 }
 
 
-def pick_topic(avoid, rule):
-    """A discovery story nobody on this channel has told yet."""
+def _never(banned):
+    return ", ".join(b.replace("_", " ") for b in banned)
+
+
+def scout(lane, domains, banned, today):
+    """What is being talked about right now, for the trending lane.
+
+    Prose, not JSON: web search answers carry citations, and structured
+    output refuses citations. pick_topic turns this into a choice."""
+    tool = {"type": "web_search_20260209", "name": "web_search",
+            "max_uses": 6, "allowed_domains": list(domains)}
     return _ask(
         system=(
-            "You choose subjects for a short-form channel about the history "
-            "of scientific discovery.\n\n"
-            f"The channel rule, which is absolute: {rule}\n\n"
-            "A subject qualifies only if it is a story about how somebody "
-            "found something out -- a named person, in a named place, in a "
-            "known year. Not a fact, not a list, not a phenomenon. The "
-            "strongest subjects are ones where the popular version and the "
-            "scholarly version disagree, because that gap is the video.\n\n"
-            "Space, physics, astronomy, geology, medicine and measurement "
-            "are all in range. Avoid: medical or financial advice, "
-            "religion, current conflicts, atrocity, and controversy about "
-            "living people."),
+            "You scout subjects for a short-form explainer channel. You "
+            "may only use what the search tool can reach.\n\n"
+            f"The lane: {lane['about']}\n\n"
+            f"Never: {_never(banned)}."),
         prompt=(
-            "Propose one subject.\n\n"
+            f"Today is {today}. Find up to six things in the news in the "
+            "last two weeks that have a checkable, explainable story "
+            "behind them. For each: what happened, the date, the URL you "
+            "read it at, and the one question behind it that a 45-second "
+            "explainer could answer and that will still be true next "
+            "month. Leave out anything still unfolding."),
+        tools=[tool], effort="medium", label="scout")
+
+
+def pick_topic(avoid, rule, lane_name, lane, banned, today, leads=""):
+    """One subject for this lane that the channel has not covered."""
+    return _ask(
+        system=(
+            "You choose subjects for a short-form channel.\n\n"
+            f"The channel rule, which is absolute: {rule}\n\n"
+            f"This video is in the {lane_name} lane. {lane['about']}\n\n"
+            f"In range: {' '.join(lane['range'].split())}.\n\n"
+            f"Never: {_never(banned)}. A subject that brushes one of "
+            "these is the wrong subject -- choose another."),
+        prompt=(
+            f"Today is {today}. Propose one subject.\n\n"
             "Already covered, do not repeat or closely overlap:\n"
             + ("\n".join(f"- {a}" for a in avoid) or "- nothing yet")
+            + (f"\n\nLeads, for direction only. Never copy a title or a "
+               f"framing from them:\n{leads}" if leads else "")
             + "\n\nslug: lowercase-hyphenated, 2-4 words.\n"
-              "person: the named human the story turns on.\n"
+              "person: the named human the story turns on, or an empty "
+              "string if this lane does not need one and the story has "
+              "none.\n"
               "why: one sentence on why it is worth 45 seconds.\n"
               "gap: what most people believe, versus what the record says. "
               "If there is no such gap, say so plainly rather than "
@@ -180,7 +211,7 @@ def pick_topic(avoid, rule):
         schema=TOPIC_SCHEMA, effort="medium", label="pick_topic")
 
 
-def research(topic, person, domains):
+def research(topic, person, domains, today, lane):
     """Search the allowed domains and report back with verbatim quotes."""
     tool = {"type": "web_search_20260209", "name": "web_search",
             "max_uses": 12, "allowed_domains": list(domains)}
@@ -194,11 +225,14 @@ def research(topic, person, domains):
             "Quote exactly. A paraphrase is not a quote. If you cannot find "
             "the sentence that supports a claim, the claim does not exist."),
         prompt=(
-            f"Subject: {topic}\nPerson: {person}\n\n"
+            f"Today is {today}.\nSubject: {topic}\n"
+            f"Person: {person or 'none named yet'}\n"
+            f"The video it is for: {' '.join(lane['about'].split())}\n\n"
             "Search, read, and report:\n\n"
             "1. SOURCES -- for each page you actually used: the URL, its "
-            "title, its publisher, and whether it is primary, scholarly, "
-            "encyclopedia or museum.\n\n"
+            "title, its publisher, its publication date if it shows one, "
+            "and whether it is primary, scholarly, encyclopedia, museum "
+            "or news.\n\n"
             "2. THE POPULAR VERSION -- what the widely repeated story says, "
             "and where that version comes from if you can establish it.\n\n"
             "3. THE RECORD -- what the sources actually support. Names, "
@@ -224,7 +258,8 @@ CLAIMS_SCHEMA = {
                     "publisher": {"type": "string"},
                     "kind": {"type": "string",
                              "enum": ["primary", "scholarly", "encyclopedia",
-                                      "museum", "popular", "unknown"]},
+                                      "museum", "news", "popular",
+                                      "unknown"]},
                 },
                 "required": ["url", "title", "publisher", "kind"],
                 "additionalProperties": False,
@@ -296,16 +331,34 @@ SCRIPT_SCHEMA = {
 }
 
 
-def write_script(topic, claims, myths, limits):
+def write_script(topic, claims, myths, limits, lane_name, lane, media,
+                 banned):
     lo, hi = limits
+    g = lane["gates"]
+    rules = [f"- {lo}-{hi} words total."]
+    if g.get("must_name_person"):
+        rules.append("- Name a person, and return that name in `person`, "
+                     "spelled exactly as the script spells it.")
+    else:
+        rules.append("- If the script names a person, return that name in "
+                     "`person`, spelled exactly as the script spells it; "
+                     "otherwise return an empty string.")
+    if g.get("must_name_place_or_year"):
+        rules.append("- Name a place or a year.")
+    if g.get("must_name_date"):
+        rules.append("- Say when: a year, or a month and year.")
+    if g.get("must_carry_specific"):
+        rules.append("- Carry at least one checkable specific: a number, a "
+                     "year, or a named place or thing. A script made only "
+                     "of generalities is rejected.")
+    cap = media.get("max_quote_words")
     return _ask(
         system=(
-            "You write 45-second scripts for a channel about how discoveries "
-            "were actually made. Not what is true -- how we came to know it.\n\n"
-            "Hard rules:\n"
-            f"- {lo}-{hi} words total.\n"
-            "- Name a person, and return that name in `person`, spelled "
-            "exactly as the script spells it. Name a place or a year.\n"
+            "You write 45-second scripts for a channel that shows how we "
+            "know things, not just what is true.\n\n"
+            f"This one is in the {lane_name} lane. "
+            f"{' '.join(lane['about'].split())}\n\n"
+            "Hard rules:\n" + "\n".join(rules) + "\n"
             "- Every factual statement must come from the claims you are "
             "given. You may not add a number, a date or a name that is not "
             "in them. If a line needs a fact you do not have, cut the line.\n"
@@ -313,8 +366,12 @@ def write_script(topic, claims, myths, limits):
             "- Do not open with 'Did you know', 'Hey guys', 'In this video' "
             "or 'Let's dive in'.\n"
             "- One line may be a verbatim source quotation, marked "
-            "voice='quote'. Its text must match a quote in the claims "
-            "exactly.\n\n"
+            "voice='quote'"
+            + (f", of at most {cap} words" if cap else "")
+            + ". Its text must match a quote in the claims exactly.\n"
+            f"- Never: {'; '.join(media.get('never', []))}. Brands: "
+            f"{media.get('brand_names', 'identify only')}.\n"
+            f"- Do not stray into: {_never(banned)}.\n\n"
             "Write in short sentences. One line per sentence-group -- a "
             "line is what one shot will sit under, so break where the "
             "picture should change. gap is the silence after a line in "
@@ -354,7 +411,7 @@ SHOTS_SCHEMA = {
 }
 
 
-def storyboard(lines, claims, catalogue):
+def storyboard(lines, claims, catalogue, max_quote_words=None):
     return _ask(
         system=(
             "You storyboard a narrated short by choosing, for each line of "
@@ -367,7 +424,9 @@ def storyboard(lines, claims, catalogue):
             "every duration from the narration. Give content only.\n"
             "- Every date, number, name and quotation you put on screen "
             "must come from the claims. On-screen text that states a fact "
-            "not in the claims is the one unrecoverable error here.\n\n"
+            "not in the claims is the one unrecoverable error here.\n"
+            + (f"- A quote_card holds at most {max_quote_words} words.\n"
+               if max_quote_words else "") + "\n"
             "Choose for meaning: a date becomes timeline, a quotation "
             "becomes quote_card, a figure becomes number_reveal, two "
             "competing versions become versus, a location becomes map_zoom, "

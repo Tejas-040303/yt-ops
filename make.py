@@ -6,6 +6,7 @@ One command from storyboard to uploadable video.
     python make.py shots/0001.yaml --plan        # print the plan, render nothing
 
     python make.py --auto                        # pick a subject and make it
+    python make.py --auto --lane trending        # in a given lane
     python make.py --auto --topic "how we weighed the Earth"
 
 The storyboard is the entire input. Nothing gets edited per video any
@@ -287,6 +288,10 @@ def main(argv=None):
                          "(needs ANTHROPIC_API_KEY)")
     ap.add_argument("--topic", help="with --auto: the subject to research, "
                                     "instead of letting it choose")
+    ap.add_argument("--lane", help="with --auto: found_out, curiosity or "
+                                   "trending (default: furthest behind)")
+    ap.add_argument("--swipe", help="with --auto: a collected listing to "
+                                    "steer the topic (see auto.py)")
     ap.add_argument("--skip-vo", action="store_true",
                     help="reuse the existing vo.wav and vo.json")
     ap.add_argument("--plan", action="store_true",
@@ -297,12 +302,16 @@ def main(argv=None):
         if a.storyboard:
             die("pass a storyboard or --auto, not both")
         import auto
-        a.storyboard = auto.main(["--topic", a.topic] if a.topic else [])
+        passed = []
+        for flag in ("topic", "lane", "swipe"):
+            if getattr(a, flag):
+                passed += [f"--{flag}", getattr(a, flag)]
+        a.storyboard = auto.main(passed)
         print("\n" + "=" * 60)
     elif not a.storyboard:
         die("give me a storyboard (shots/NNNN.yaml) or --auto")
-    elif a.topic:
-        die("--topic only means something with --auto")
+    elif a.topic or a.lane or a.swipe:
+        die("--topic, --lane and --swipe only mean something with --auto")
 
     board = load(a.storyboard)
     code = board["code"]
@@ -339,6 +348,17 @@ def main(argv=None):
     print("\nrender")
     render_mod.main(shots=shots, code=code, sfx=sfx,
                     music=board.get("music"), tail=TAIL)
+
+    # vo.json is overwritten by the next video. This copy is what lets
+    # retention_report.py name the line and scene behind a drop later.
+    timing = os.path.join("out", f"{code}-timing.json")
+    os.makedirs("out", exist_ok=True)
+    json.dump({"code": code, "duration": total, "lines": vo["timeline"],
+               "shots": [{"scene": b["scene"], "lines": b["lines"],
+                          "start": s["start"], "end": s["end"]}
+                         for b, s in zip(board["shots"], shots)]},
+              open(timing, "w", encoding="utf-8"), indent=2)
+    print(f"  {timing}")
 
     meta = board.get("metadata")
     if meta:

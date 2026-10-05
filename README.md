@@ -1,14 +1,18 @@
 # yt-ops
 
-Pipeline for **Had To Find Out** (`@hadtofindout`) — short-form videos about
-how discoveries were actually made.
+Pipeline for **Had To Find Out** (`@hadtofindout`) — short-form videos that
+answer one real question and show how we know the answer.
 
-> **Channel rule:** Every video tells the story of how somebody found
-> something out. Not what is true, but how we came to know it.
+> **Channel rule:** Every video answers one real question, and shows how
+> we know the answer: a source behind every claim, and a person, a place,
+> a year or a number to anchor it. Not trivia — how we know.
 
-A script that names no person, no place and no year is rejected. That one
-constraint keeps the channel out of generic-fact territory, which is what
-YouTube's inauthentic-content policy targets.
+The subjects are general now — three [lanes](#lanes), from the history
+of discovery to everyday questions to the story behind the news. The
+rule above is what did not widen. A script with no checkable specific in
+it is rejected, because that one constraint keeps the channel out of
+generic-fact territory, which is what YouTube's inauthentic-content
+policy targets.
 
 ---
 
@@ -22,7 +26,8 @@ stay that way.
 
 | Stage | State | Script |
 |---|---|---|
-| Topic selection | automated | `make.py --auto` → `brain.py` |
+| Lane choice | automated, by share | `auto.py` → `config.yaml` `lanes` |
+| Topic selection | automated | `make.py --auto` → `brain.py` (trending: searches the news first) |
 | Research → sources → accounts → claims | automated, **unverified** | `auto.py` → `brain.py` |
 | Script writing | automated | `auto.py` → `brain.py` |
 | Storyboard (line → scene) | automated | `auto.py` → `shots/NNNN.yaml` |
@@ -31,14 +36,60 @@ stay that way.
 | Scene generation | automated, 8 scenes | `make.py` → `scene_*.py` |
 | SFX placement | automated | `make.py` |
 | Render | automated | `make.py` → `render.py` |
+| Title ranking | automated, advisory | `auto.py` → youtube-agent-skill `title.py` |
 | Metadata | automated | `make.py` → `metadata.py` |
 | **Checking the claims** | **manual, permanently** | `research/NNNN-notes.md` |
 | Upload | manual, deliberately | — |
+| Retention reading | automated, per video | `retention_report.py` → youtube-agent-skill `retention.py` |
 
 Upload stays manual. It removes the Google API compliance audit entirely,
 removes upload quota, removes duplicate-upload bugs, and puts a human
 between the machine and the channel — which is the line YouTube's policy
 draws between "AI-assisted" and "mass-produced".
+
+---
+
+## Lanes
+
+Three kinds of video, one channel. `make.py --auto` makes whichever lane
+is furthest behind its share of everything made so far; `--lane` forces
+one.
+
+| Lane | Share | What it is | Must have | Sources |
+|---|---|---|---|---|
+| `found_out` | 50% | How somebody found something out — the original channel | a named person, a year, a specific | 4+, at least 1 primary or scholarly |
+| `curiosity` | 30% | One everyday question answered properly | a number, year or name | 3+, at least 1 primary, scholarly, museum or encyclopedia |
+| `trending` | 20% | The checkable story behind something in the news | a year or month, a specific | 3+, at least 2 news or primary |
+
+Every lane is domain-locked to its own list in `config.yaml` and every
+claim still needs a verbatim quote. The lanes change the brief, never
+the discipline.
+
+**Why the shares lean on `found_out`.** YouTube's inauthentic-content
+policy is about channels whose videos are hard to tell apart: one
+template, little variation, easily made at scale. This channel already
+has the template — one locked voice, one length band, one house style,
+two a day. What has kept each video distinct is a specific, sourced
+story, and `found_out` carries that most strongly. Keep it the largest
+share. The "a number, year or name" gate exists for the same reason: a
+script made only of generalities is the video this channel is built not
+to make.
+
+**Grey areas.** `gates.banned_topic_areas` (medical, financial or legal
+advice, religion, politics, conflicts, recent disasters and deaths,
+crime and trials, controversy about living people, children, and more)
+goes to the model when it picks a subject and when it writes. `trending`
+adds celebrity news, anything still unfolding, and reacting to another
+creator's video. No program can check a topic area, so these are also
+the first thing to read in review.
+
+**Copyright.** Every frame comes from a `scene_*.py` and every sound
+from kokoro or `make_sfx.py`, so there has been nothing to license.
+`config.yaml` `media` keeps it that way as subjects widen: no clips,
+screenshots, logos or likenesses, no lyrics or lines from films and
+shows, brands named only to identify them, and any quotation — spoken
+or on a `quote_card` — capped at 25 words. That cap is a conservative
+house rule, not legal advice.
 
 ---
 
@@ -61,6 +112,15 @@ ANTHROPIC_API_KEY=sk-ant-...
 Nothing else in the pipeline needs it. A storyboard you wrote yourself
 renders without touching the API.
 
+The [youtube-agent-skill](https://github.com/Tejas-040303/youtube-agent-skill)
+fork goes next to this checkout. Title ranking, the swipe file and
+retention reports call its tools (`ytskill.py`); without it, title
+ranking is skipped with a note and everything else runs.
+
+```bash
+git clone https://github.com/Tejas-040303/youtube-agent-skill ../youtube-agent-skill
+```
+
 System dependencies:
 
 - **ffmpeg** — must be built with `--enable-libass` (burns captions)
@@ -79,12 +139,15 @@ Model files, not in git (~340 MB), from
 From nothing:
 
 ```bash
-python make.py --auto                              # it picks the subject
+python make.py --auto                              # it picks the lane and the subject
+python make.py --auto --lane curiosity             # a given lane
 python make.py --auto --topic "how we weighed the Earth"
+python make.py --auto --swipe research/swipe.json  # steer it with what is working
 ```
 
-It chooses a subject it has not covered, researches it against the
-allowed domains, writes the script, storyboards it and renders it. Then
+It picks the lane furthest behind its share, chooses a subject it has
+not covered, researches it against that lane's allowed domains, writes
+the script, ranks the titles, storyboards it and renders it. Then
 **read `research/NNNN-notes.md` before it ships** — particularly the
 section on what it could not establish. That file is the whole point of
 the design.
@@ -113,11 +176,27 @@ blocks — `script`, `shots`, `metadata` — and the rules are enforced, not
 documented: every script line must be covered by exactly one shot, in
 order, or `make.py` refuses to run.
 
+`--swipe` takes a listing of comparable channels' videos — collect it
+with `yt-dlp --flat-playlist -J` per channel, shaped as
+[yt-viral](https://github.com/Tejas-040303/youtube-agent-skill/tree/main/skills/yt-viral)
+describes. The outliers, ranked by how far each beat its own channel's
+median, go to topic selection as direction, never as titles to copy.
+
 Then upload manually and record the ID:
 
 ```bash
 python -c "import sqlite3;c=sqlite3.connect('db.sqlite');c.execute(\"UPDATE videos SET youtube_id='XXX', published_at=datetime('now') WHERE id=1\");c.commit()"
 ```
+
+A few days later, export its audience-retention CSV from Studio and:
+
+```bash
+python retention_report.py shots/0002.yaml retention.csv
+```
+
+It names the script line and the scene on screen at every drop, from
+the timings `make.py` saved to `out/<code>-timing.json`. Read the
+patterns across twenty videos, not one.
 
 ---
 
@@ -159,8 +238,10 @@ Hierarchy lives in foreign keys. Files get a flat readable code:
 | `make_vo.py` | *(superseded by `make.py`)* Video 1's TTS with its script hardcoded |
 | `captions.py` | Word timings → styled `.ass`. Isolates long tokens so dates hold alone |
 | `make.py` | **The pipeline.** Storyboard → voice, captions, scenes, SFX, render, metadata |
-| `brain.py` | The Claude API calls: pick a subject, research it, write it, storyboard it |
-| `auto.py` | Runs those four, enforces the gates, writes the DB rows and the storyboard |
+| `brain.py` | The Claude API calls: scout the news, pick a subject, research it, write it, storyboard it — each briefed by its lane |
+| `auto.py` | Picks the lane, runs those steps, enforces the gates, ranks the titles, writes the DB rows and the storyboard |
+| `ytskill.py` | The bridge to the youtube-agent-skill fork: title lint, swipe file, retention reading |
+| `retention_report.py` | A Studio retention export → the line and scene behind every drop |
 | `research/` | Per-video audit trail: the raw notes and the claims with their quotes. Not in git |
 | `shots/NNNN.yaml` | One storyboard per video. The only file that changes between videos |
 | `scene_kit.py` | **Scene library core:** palette, easing, fonts, safe area, encode. Every scene imports it |
@@ -311,7 +392,7 @@ candidate sources and drafts; a human verifies claims against them and
 approves. Two things make that check small rather than a research
 session of its own.
 
-The search is **domain-locked**. `sources.preferred_domains` is handed
+The search is **domain-locked**. Each lane's `domains` list is handed
 to the web search tool as `allowed_domains`, so a blog repeating the
 myth is not discouraged, it is unreachable.
 
@@ -328,8 +409,9 @@ deliberately no code that does it.
 ### Then: analytics loop
 
 ```
-analytics.py   pull retention into analytics_daily
-report.py      Telegram digest
+retention_report.py   done: a retention export → line and scene per drop
+analytics.py          pull daily stats into analytics_daily
+report.py             Telegram digest
 ```
 
 Log everything. **Do not compute p-values.** At 60 videos/month against
