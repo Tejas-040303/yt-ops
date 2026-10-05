@@ -27,14 +27,22 @@ Every claim must then carry a verbatim quote from one of those pages,
 and a claim that cannot produce one does not survive extract().
 """
 
+import inspect
 import json
 import os
 import sys
 
-MODEL = "claude-opus-5"
+MODEL = "claude-opus-5-5"
 
-# Listed Opus 5 rates, for the cost line only. Not billing.
-USD_IN, USD_OUT = 5.00 / 1e6, 25.00 / 1e6
+# Listed Opus 5.5 rates, for the cost line only. Not billing -- and a
+# turn a fallback model answered was billed at that model's rates.
+USD_IN, USD_OUT = 4.00 / 1e6, 20.00 / 1e6
+
+# A request the safety classifiers decline is re-run server-side on the
+# model Anthropic recommends for that refusal category, instead of
+# stopping the run. Biology and toxicology are among the categories, and
+# medicine's history is in range for this channel.
+FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 MAX_CONTINUATIONS = 5     # pause_turn restarts before giving up
 _spend = {"in": 0, "out": 0, "calls": 0}
@@ -43,8 +51,9 @@ _spend = {"in": 0, "out": 0, "calls": 0}
 PLACEHOLDER = "sk-ant-REPLACE-ME"   # the value .env.example ships with
 
 
-def _env_key(path):
-    """ANTHROPIC_API_KEY from a .env file, whatever wrote it.
+def _env_key(path, name="ANTHROPIC_API_KEY"):
+    """A key from a .env file (ANTHROPIC_API_KEY unless named), whatever
+    wrote the file.
 
     Windows PowerShell's `echo ... > .env` writes UTF-16 and Notepad may
     add a UTF-8 BOM, so the bytes are decoded by their BOM rather than
@@ -56,9 +65,8 @@ def _env_key(path):
     else:
         text = raw.decode("utf-8-sig", errors="replace")
     for line in text.splitlines():
-        name, eq, value = line.partition("=")
-        if eq and name.strip().removeprefix("export ").strip() == \
-                "ANTHROPIC_API_KEY":
+        key, eq, value = line.partition("=")
+        if eq and key.strip().removeprefix("export ").strip() == name:
             return value.strip().strip('"').strip("'")
     return None
 
@@ -100,26 +108,142 @@ def _charge(usage):
     _spend["calls"] += 1
 
 
+# --- which backend answers ----------------------------------------
+#
+# config.yaml llm.provider (or $YT_LLM_PROVIDER for one run):
+#   claude_api   the Anthropic API, below -- needs API credits
+#   claude_code  the `claude -p` CLI on your Claude plan (brain_claude_code.py)
+#   gemini       Google's Gemini API (brain_gemini.py)
+# Every step's prompt and schema is the same whichever answers.
+
+PROVIDERS = ("claude_api", "claude_code", "gemini")
+
+
+def _provider():
+    """(provider, its settings) from config.yaml, read once."""
+    if "provider" not in _spend:
+        llm = {}
+        try:
+            import yaml
+            cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "config.yaml")
+            llm = (yaml.safe_load(open(cfg, encoding="utf-8")) or {}).get(
+                "llm") or {}
+        except (OSError, ImportError):
+            pass
+        name = os.environ.get("YT_LLM_PROVIDER") or llm.get("provider") \
+            or "claude_api"
+        if name not in PROVIDERS:
+            raise SystemExit(f"llm.provider {name!r} -- choose one of "
+                             f"{', '.join(PROVIDERS)}")
+        _spend["provider"], _spend["settings"] = name, llm.get(name) or {}
+    return _spend["provider"], _spend["settings"]
+
+
+def provider():
+    """The backend this run uses: claude_api, claude_code or gemini."""
+    return _provider()[0]
+
+
+def _ask_elsewhere(provider, settings, **call):
+    if provider == "claude_code":
+        import brain_claude_code as backend
+    else:
+        import brain_gemini as backend
+    result, meter = backend.ask(**call, settings=settings)
+    _spend["in"] += meter["in"]
+    _spend["out"] += meter["out"]
+    _spend["calls"] += 1
+    if meter.get("usd") is not None:
+        _spend["usd"] = _spend.get("usd", 0.0) + meter["usd"]
+    return result
+
+
 def spend_line():
+    provider = _spend.get("provider", "claude_api")
+    tokens = (f"{_spend['calls']} calls, {_spend['in']:,} in / "
+              f"{_spend['out']:,} out tokens")
+    if provider == "claude_code":
+        usd = _spend.get("usd")
+        return (f"{tokens} via Claude Code -- counted against your Claude "
+                f"plan, not API credits"
+                + (f" (Claude Code's list-price estimate: ${usd:.2f})"
+                   if usd is not None else ""))
+    if provider == "gemini":
+        return (f"{tokens} via Gemini -- $0 within the free tier's limits")
     d = _spend["in"] * USD_IN + _spend["out"] * USD_OUT
-    return (f"{_spend['calls']} API calls, {_spend['in']:,} in / "
-            f"{_spend['out']:,} out tokens, about ${d:.2f} at listed "
+    return (f"{tokens} via the Anthropic API, about ${d:.2f} at listed "
             f"{MODEL} rates")
 
 
-def _text(message):
-    return "\n".join(b.text for b in message.content if b.type == "text")
+def _text(blocks):
+    return "\n".join(b.text for b in blocks if b.type == "text")
 
 
-def _ask(system, prompt, schema=None, tools=None, effort="high",
+def _supports_fallbacks(client):
+    """Older anthropic SDKs have no `fallbacks` parameter. Run without it
+    there rather than fail on an unexpected keyword."""
+    try:
+        return "fallbacks" in inspect.signature(
+            client.beta.messages.create).parameters
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
+def _extend(turn, new):
+    """The assistant turn so far, plus what a resumed request returned.
+
+    A resumed pause_turn returns the blocks that came after the pause, so
+    they are appended: dropping the earlier ones loses that part of the
+    research, and on Opus 5.5 changes the history its thinking blocks
+    are bound to. If a response ever repeats the turn from the start
+    instead, it replaces it, so nothing is doubled either way."""
+    new = list(new)
+    if turn and new and new[0].model_dump() == turn[0].model_dump():
+        return new
+    return turn + new
+
+
+def _echoable(turn):
+    """The turn as it may be sent back to resume. After a server-side
+    fallback, the declined model's thinking and tool calls from before the
+    switch are left out, as the fallback docs require; text, completed
+    server-tool pairs and everything after the switch go back as-is."""
+    switch = max((i for i, b in enumerate(turn) if b.type == "fallback"),
+                 default=-1)
+    if switch < 0:
+        return turn
+    answered = {getattr(b, "tool_use_id", None) for b in turn}
+    return [b for i, b in enumerate(turn)
+            if i > switch
+            or b.type not in ("thinking", "redacted_thinking", "tool_use",
+                              "server_tool_use")
+            or (b.type == "server_tool_use" and b.id in answered)]
+
+
+def _ask(system, prompt, schema=None, tools=None, effort="medium",
          max_tokens=16000, label=""):
     """One turn, with the server-tool pause_turn loop handled.
 
     A long server-tool turn stops with stop_reason 'pause_turn' after the
     server's own sampling limit. Resuming means re-sending the assistant
-    turn with no extra user message -- the API sees the trailing
+    turn so far with no extra user message -- the API sees the trailing
     server_tool_use block and picks up where it left off.
+
+    Effort defaults to medium: on Opus 5.5 it is the documented starting
+    point, which out-thinks Opus 5 at high and thinks more per level, so
+    carrying "high" over would cost more than before for little gain.
+
+    With llm.provider set to claude_code or gemini, the same call goes to
+    that backend instead and nothing below runs.
     """
+    provider, settings = _provider()
+    if provider != "claude_api":
+        return _ask_elsewhere(provider, settings, system=system,
+                              prompt=prompt, schema=schema, tools=tools,
+                              effort=effort, max_tokens=max_tokens,
+                              label=label)
+
     import anthropic
 
     client = _client()
@@ -132,16 +256,27 @@ def _ask(system, prompt, schema=None, tools=None, effort="high",
                   output_config=output_config)
     if tools:
         kwargs["tools"] = tools
+    if _supports_fallbacks(client):
+        kwargs.update(betas=[FALLBACK_BETA], fallbacks="default")
+    elif not _spend.get("warned"):
+        _spend["warned"] = True
+        print("  NOTE: this anthropic SDK has no server-side fallback; a "
+              "refusal will stop the run. pip install -r requirements.txt",
+              file=sys.stderr)
+    create = client.beta.messages.create
 
-    messages = [{"role": "user", "content": prompt}]
+    prompt_turn = {"role": "user", "content": prompt}
     try:
-        response = client.messages.create(messages=messages, **kwargs)
+        response = create(messages=[prompt_turn], **kwargs)
+        _charge(response.usage)
+        turn = list(response.content)
         for _ in range(MAX_CONTINUATIONS):
             if response.stop_reason != "pause_turn":
                 break
-            messages = messages[:1] + [
-                {"role": "assistant", "content": response.content}]
-            response = client.messages.create(messages=messages, **kwargs)
+            response = create(messages=[prompt_turn, {
+                "role": "assistant", "content": _echoable(turn)}], **kwargs)
+            _charge(response.usage)
+            turn = _extend(turn, response.content)
         else:
             raise SystemExit(f"{label}: still paused after "
                              f"{MAX_CONTINUATIONS} continuations")
@@ -155,7 +290,13 @@ def _ask(system, prompt, schema=None, tools=None, effort="high",
     except anthropic.APIConnectionError:
         raise SystemExit(f"{label}: could not reach the API. Check the network.")
 
-    _charge(response.usage)
+    # The documented served-by signal: a fallback_message iteration. (The
+    # fallback content block is absent on turns routed straight to the
+    # fallback model.)
+    if any(getattr(it, "type", "") == "fallback_message"
+           for it in (getattr(response.usage, "iterations", None) or [])):
+        print(f"  NOTE: {label}: {MODEL} declined it; {response.model} "
+              f"answered (server-side fallback)", file=sys.stderr)
     if response.stop_reason == "refusal":
         why = getattr(response.stop_details, "explanation", "") or ""
         raise SystemExit(f"{label}: the model declined. {why}")
@@ -163,7 +304,7 @@ def _ask(system, prompt, schema=None, tools=None, effort="high",
         print(f"  NOTE: {label} hit max_tokens -- output may be cut short",
               file=sys.stderr)
 
-    body = _text(response)
+    body = _text(turn)
     if schema:
         try:
             return json.loads(body)
