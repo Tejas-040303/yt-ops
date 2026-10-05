@@ -13,6 +13,7 @@ CREATE TABLE topics (
     slug         TEXT NOT NULL UNIQUE,          -- 'earth-age'
     title        TEXT NOT NULL,                 -- 'How we learned the age of the Earth'
     status       TEXT NOT NULL DEFAULT 'new',   -- new | researching | ready | exhausted | rejected
+    lane         TEXT NOT NULL DEFAULT 'found_out', -- found_out | curiosity | trending (config.yaml lanes)
     reject_note  TEXT,
     created_at   TEXT NOT NULL DEFAULT (datetime('now')),
     researched_at TEXT

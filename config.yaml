@@ -6,39 +6,166 @@ channel:
   name: "Had To Find Out"
   handle: "@hadtofindout"
   rule: >
-    Every video tells the story of how somebody found something out.
-    Not what is true, but how we came to know it.
-  pillar: "history of scientific discovery"
+    Every video answers one real question, and shows how we know the
+    answer: a source behind every claim, and a person, a place, a year or
+    a number to anchor it. Not trivia -- how we know.
+  pillar: "how we know what we know"   # was "history of scientific discovery"; now lanes.found_out
 
-# --- Hard gates. A script failing any of these is rejected, not fixed. ---
+# --- Hard gates for every lane. Failing one rejects the script. ---
+# Lane-specific gates live under lanes.<lane>.gates.
 gates:
-  must_name_person: true           # a named human
-  must_name_place_or_year: true    # anchors it in reality
-  min_sources_scholarly: 1         # at least one scholarly/primary source
-  reject_if_only_popular_sources: true
   check_myth_blacklist: true
   max_similarity_to_past: 0.75     # vs all previous scripts
-  banned_topic_areas:              # policy + ad-suitability risk
+  # Grey areas. Handed to the model when it picks and writes; no program
+  # can check them, so they are also the first thing to read in review.
+  banned_topic_areas:
     - medical_advice
     - financial_advice
+    - legal_advice
     - religion
-    - current_conflicts
+    - politics_elections_and_policy_debates
+    - current_conflicts_and_terrorism
     - atrocity_and_genocide
-    - living_named_individuals_controversy
+    - recent_disasters_and_deaths
+    - crime_and_ongoing_trials
+    - living_people_controversy_or_private_life
+    - children_as_subjects
+    - drugs_weapons_and_gambling
+    - conspiracy_theories_presented_as_open_questions
+    - sexual_content
+
+# --- Lanes: three kinds of video, one channel. ---
+# auto.py makes whichever lane is furthest behind its share, or the one
+# --lane names. The shares are policy, not tuning: what keeps one video
+# distinguishable from the next is a specific, sourced story, and that is
+# the line YouTube's inauthentic-content policy draws for a templated,
+# synthetic-voice channel. found_out carries that most strongly -- keep
+# it the largest share.
+lanes:
+  found_out:
+    share: 0.5
+    about: >-
+      How somebody found something out: a named person, in a named place,
+      in a known year. The strongest subjects are the ones where the
+      popular version and the record disagree, because that gap is the
+      video.
+    range: >-
+      science, exploration, inventions, measurement, maps, medicine's
+      history (never advice), language, food, sport, everyday objects
+    gates:
+      must_name_person: true
+      must_name_place_or_year: true   # a program can only see the year
+      must_name_date: false
+      must_carry_specific: true       # a number, a year or a named thing
+      min_sources: 4
+      min_strong_sources: 1
+      strong_kinds: [primary, scholarly]
+    domains:
+      - plato.stanford.edu
+      - archive.org
+      - loc.gov
+      - royalsocietypublishing.org
+      - nasa.gov
+      - si.edu                        # Smithsonian
+      - biodiversitylibrary.org
+      - mathshistory.st-andrews.ac.uk
+      - lindahall.org
+      - britannica.com
+    hashtags: ["#history", "#science", "#howweknow"]
+
+  curiosity:
+    share: 0.3
+    about: >-
+      One everyday question answered properly: why something is the way
+      it is, or how it actually works. Phrased as the question a curious
+      person would type, answered with something checkable -- a number, a
+      date, a named place or thing -- never a vague "scientists say".
+    range: >-
+      the body (never advice), nature, weather, space, food, language and
+      word origins, objects, buildings, transport, maps, money's history
+      (never advice), sport rules
+    gates:
+      must_name_person: false
+      must_name_place_or_year: false
+      must_name_date: false
+      must_carry_specific: true
+      min_sources: 3
+      min_strong_sources: 1
+      strong_kinds: [primary, scholarly, museum, encyclopedia]
+    domains:
+      - britannica.com
+      - si.edu
+      - nasa.gov
+      - noaa.gov
+      - usgs.gov
+      - nist.gov
+      - loc.gov
+      - archive.org
+      - merriam-webster.com
+      - metoffice.gov.uk
+      - plato.stanford.edu
+      - royalsocietypublishing.org
+    hashtags: ["#science", "#explained", "#howweknow"]
+
+  trending:
+    share: 0.2
+    about: >-
+      Something people are talking about this week, and the checkable
+      story behind it: where it came from, how it works, what the record
+      says. An explainer that would still be true next month -- never a
+      news recap, a reaction, or a take on somebody else's video.
+    range: >-
+      launches, discoveries, records, anniversaries, viral questions,
+      phenomena in the news (weather, space, animals), a new word
+    extra_banned:
+      - celebrity_news_or_gossip
+      - anything_still_unfolding_where_facts_may_change
+      - reacting_to_or_summarising_another_creators_video
+    gates:
+      must_name_person: false
+      must_name_place_or_year: false
+      must_name_date: true            # a year or a month: a trend has a when
+      must_carry_specific: true
+      min_sources: 3
+      min_strong_sources: 2           # two independent outlets, or the primary source
+      strong_kinds: [news, primary]
+    domains:
+      - reuters.com
+      - apnews.com
+      - bbc.com
+      - bbc.co.uk
+      - npr.org
+      - nasa.gov
+      - noaa.gov
+      - si.edu
+      - britannica.com
+      - loc.gov
+    hashtags: ["#explained", "#news", "#howweknow"]
+
+# --- What may appear on screen and in the audio. ---
+# Every frame is drawn by a scene_*.py and every sound comes from kokoro
+# or make_sfx.py, which is why copyright has not been a risk so far.
+# These keep it that way as the subjects widen. A conservative house
+# rule, not legal advice.
+media:
+  original_only: true
+  never:
+    - clips, stills or screenshots from films, TV, games, other videos or social posts
+    - logos, brand marks or product photos
+    - a real person's likeness
+    - song lyrics, music we did not make, or lines from films, shows or games
+  brand_names: "name a brand only to identify it; never imply endorsement"
+  max_quote_words: 25              # any quotation, spoken or on a quote_card
 
 # --- Source ranking used during research ---
 sources:
-  kinds_ranked: [primary, scholarly, museum, encyclopedia, popular]
-  preferred_domains:
-    - plato.stanford.edu
-    - archive.org
-    - loc.gov
-    - royalsocietypublishing.org
-    - nasa.gov
-    - si.edu                       # Smithsonian
-    - biodiversitylibrary.org
-  min_sources_per_topic: 4
+  kinds_ranked: [primary, scholarly, museum, encyclopedia, news, popular]
   cache_locally: true              # sources disappear; keep a copy
+
+# --- The youtube-agent-skill fork, used for title lint, the swipe file
+# and retention reports. Path is relative to this file. ---
+tools:
+  youtube_agent_skill: "../youtube-agent-skill"
 
 # --- Accounts (competing versions of the story) ---
 accounts:
