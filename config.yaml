@@ -125,6 +125,9 @@ lanes:
       - metoffice.gov.uk
       - plato.stanford.edu
       - royalsocietypublishing.org
+      - smithsonianmag.com         # Smithsonian Magazine; si.edu is the institution
+      - patents.google.com         # the patent behind an everyday object: primary
+      - physics.aps.org            # American Physical Society, open access
     hashtags: ["#science", "#explained", "#howweknow"]
 
   trending:

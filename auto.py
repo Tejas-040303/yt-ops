@@ -111,8 +111,12 @@ def db():
 
 
 def covered(con):
-    return [f"{r[0]} -- {r[1]}" for r in
-            con.execute("SELECT slug, title FROM topics").fetchall()]
+    """Every topic pick_topic must not propose again: the ones made, and
+    the ones tried and stopped for too few sources, with why."""
+    return [f"{slug} -- {title}"
+            + (f"  (tried, stopped: {note})" if status == "rejected" else "")
+            for slug, title, status, note in con.execute(
+                "SELECT slug, title, status, reject_note FROM topics")]
 
 
 def myths(con):
@@ -131,6 +135,7 @@ def choose_lane(con, lanes):
     instead of only on average, and the choice is reproducible. Ties go
     to the lane listed first in config.yaml."""
     made = dict(con.execute("SELECT lane, COUNT(*) FROM topics "
+                            "WHERE status != 'rejected' "
                             "GROUP BY lane").fetchall())
     total = sum(made.get(n, 0) for n in lanes) + 1
     return max(lanes, key=lambda n: lanes[n]["share"] * total
@@ -353,6 +358,19 @@ def unique_slug(con, slug):
     return out
 
 
+def reject(con, topic, lane_name, note):
+    """Remember a topic that stopped at the source gate, so the next run
+    does not research it again. It does not count toward its lane's
+    share; delete the row to let it be proposed again (after widening
+    the lane's domains, say)."""
+    con.execute("INSERT INTO topics (slug, title, status, lane, reject_note, "
+                "researched_at) VALUES (?, ?, 'rejected', ?, ?, "
+                "datetime('now'))",
+                (unique_slug(con, topic["slug"]), topic["title"], lane_name,
+                 note))
+    con.commit()
+
+
 def save(con, topic, data, script, seq, lane_name, stats):
     topic = {**topic, "slug": unique_slug(con, topic["slug"])}
     cur = con.cursor()
@@ -517,8 +535,11 @@ def main(argv=None):
     for f in thin:
         print(f"  GATE FAILED: {f}")
     if thin:
+        reject(con, topic, lane_name, "; ".join(thin))
+        print(f"  {brain.spend_line()}")
         raise SystemExit("  stopping: a thin topic does not proceed to "
-                         "script.")
+                         "script. Recorded as rejected, so it is not "
+                         "proposed again.")
 
     print("\nscript")
     script = brain.write_script(topic["title"], data["claims"], myths(con),
@@ -530,6 +551,7 @@ def main(argv=None):
     for f in fails:
         print(f"  GATE FAILED: {f}")
     if fails:
+        print(f"  {brain.spend_line()}")
         raise SystemExit("  rejected by the gates in config.yaml. Nothing "
                          "written to the database.")
 
