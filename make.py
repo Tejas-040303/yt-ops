@@ -369,7 +369,8 @@ def main(argv=None):
             hook=meta.get("hook"),
             sources=[tuple(s) for s in meta.get("sources", [])] or None,
             hashtags=meta.get("hashtags"),
-            video_id=meta.get("video_id"))
+            video_id=meta.get("video_id"),
+            board=board)
 
     print(f"\ndone. Upload out/{code}.mp4 and tick "
           f"'Altered or synthetic content'.")

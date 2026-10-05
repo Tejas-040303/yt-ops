@@ -121,6 +121,17 @@ ranking is skipped with a note and everything else runs.
 git clone https://github.com/Tejas-040303/youtube-agent-skill ../youtube-agent-skill
 ```
 
+The fork's interactive skills — `/yt-comment` for replies, `/yt-package`,
+`/yt-seo` — run in Claude Code, and every one reads a voice profile first.
+`voice.md` is this channel's, built from `config.yaml` and video 1; copy it
+to where they look (the file says how) and they write the way the channel
+sounds instead of asking for three of your videos. To install them:
+
+```
+/plugin marketplace add Tejas-040303/youtube-agent-skill
+/plugin install youtube-agent
+```
+
 System dependencies:
 
 - **ffmpeg** — must be built with `--enable-libass` (burns captions)
@@ -160,6 +171,14 @@ python make.py shots/0002.yaml
 
 Voice, captions, every scene, SFX placement, render and metadata. Out
 comes `out/<code>.mp4` and `out/<code>-metadata.txt`.
+
+The metadata file opens with **the fact check**, which is the final check
+before you upload: the research notes to read, every figure the video says
+or shows, and every quotation. Each figure is marked with whether
+`research/NNNN-claims.json` contains it, and each quotation with whether
+it is word for word in the claims. `NOT IN CLAIMS` means the figure came
+from nowhere the research can account for — the one error nothing
+upstream can catch once it is on screen. Ticking the boxes is yours.
 
 ```bash
 python make.py shots/0002.yaml --plan      # durations and cuts, renders nothing
@@ -255,7 +274,8 @@ Hierarchy lives in foreign keys. Files get a flat readable code:
 | `scene_ramp.py` | `ramp()` — inclined plane, ticks landing at 1 : 3 : 5 : 7 |
 | `make_sfx.py` | Synthesises the impact sound. Original audio, no licence |
 | `render.py` | Shots → 1080×1920 30fps, burns captions, mixes voice + music + SFX. Takes a storyboard's shots, or its own |
-| `metadata.py` | Title options + structured description + attributions from DB |
+| `metadata.py` | Title options, description, attributions from DB, and the fact check: every figure and quotation, marked against the claims |
+| `voice.md` | The channel's voice profile, for the youtube-agent-skill skills (`/yt-comment` and the rest) |
 | `log_assets.py` | *(legacy)* Fetches Commons licences, logs to DB. Obsolete once fully animated |
 
 ---
