@@ -263,7 +263,19 @@ def rank_titles(titles, names):
     return [r["title"] for r in rows]
 
 
-def leads_from_swipe(path, per_channel=4):
+def banned_lead(title, keywords):
+    """(area, word) if the title uses a banned-area keyword, else None.
+    Whole words, any case; curly apostrophes are straightened first, so
+    "Earth\u2019s" and "Earth's" read the same."""
+    t = title.replace("\u2019", "'").lower()
+    for area, words in (keywords or {}).items():
+        for w in words:
+            if re.search(rf"(?<![\w-]){re.escape(w.lower())}(?![\w-])", t):
+                return area, w
+    return None
+
+
+def leads_from_swipe(path, per_channel=4, keywords=None):
     """The best outliers from EACH channel, not the best overall.
 
     Channels differ in how hit-driven they are, not just in size: on the
@@ -277,13 +289,19 @@ def leads_from_swipe(path, per_channel=4):
     if rows is None:
         print(f"  swipe skipped: {note}")
         return ""
-    by = {}
+    by, dropped = {}, []
     for r in rows["outliers"]:                     # already best-first
+        hit = banned_lead(r["title"], keywords)
+        if hit:
+            dropped.append((r, hit))
+            continue
         by.setdefault(r["channel"], []).append(r)
     top = sorted((r for rs in by.values() for r in rs[:per_channel]),
                  key=lambda r: -r["multiple"])
     print(f"  {len(top)} outliers from {path}: " + ", ".join(
         f"{min(len(rs), per_channel)} {ch}" for ch, rs in by.items()))
+    for r, (area, word) in dropped:
+        print(f"  dropped  {r['title']}  ({area}: \"{word}\")")
     try:
         when = json.load(open(path, encoding="utf-8")).get("collected_at")
         age = (datetime.date.today()
@@ -435,7 +453,8 @@ def main(argv=None):
     else:
         print("\ntopic")
         leads = (leads_from_swipe(
-            a.swipe, cfg.get("swipe", {}).get("leads_per_channel", 4))
+            a.swipe, cfg.get("swipe", {}).get("leads_per_channel", 4),
+            cfg["gates"].get("banned_lead_keywords"))
             if a.swipe else "")
         if lane_name == "trending":
             news = brain.scout(lane, lane["domains"], banned, today)
