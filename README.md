@@ -102,12 +102,19 @@ pip install -r requirements.txt
 python init_db.py
 ```
 
-`make.py --auto` also needs an Anthropic API key, in the environment or
-in a `.env` next to `brain.py`:
+`make.py --auto` also needs an Anthropic API key. Copy the template and
+put your key in it — `.env` is in `.gitignore` and never leaves your
+machine:
 
+```bash
+copy .env.example .env          # Windows cmd   (PowerShell: Copy-Item .env.example .env)
+cp .env.example .env            # macOS / Linux
 ```
-ANTHROPIC_API_KEY=sk-ant-...
-```
+
+Then edit `.env` so it reads `ANTHROPIC_API_KEY=sk-ant-...` with your
+key. Avoid PowerShell's `echo ... > .env` (it writes UTF-16), and in
+Notepad save as "All files" or you get `.env.txt`. `brain.py` reads any
+of these encodings and names the `.env.txt` mistake if it finds one.
 
 Nothing else in the pipeline needs it. A storyboard you wrote yourself
 renders without touching the API.
