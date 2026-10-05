@@ -178,6 +178,7 @@ swipe:
   tabs: [shorts]
   per_channel: 60                  # newest N from each tab
   skip_newest: 5                   # still gathering views; would read as flops
+  leads_per_channel: 4             # best N outliers from EACH channel go to topic selection
   channels:
     - name: "Veritasium"
       url: "https://www.youtube.com/@veritasium"

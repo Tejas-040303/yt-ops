@@ -208,8 +208,10 @@ python make.py --auto --swipe research/swipe.json
 `swipe.py` ranks every video by how far it beat its own channel's
 median, so a 2M-view Short on a channel whose Shorts usually get 2M is
 nothing, and the same video on a channel whose median is 400k is the
-thing to study. The outliers go to topic selection as direction, never
-as titles to copy. Re-collect every week or two; `auto.py` says when
+thing to study. The best four outliers from each channel go to topic
+selection as direction, never as titles to copy — per channel, because
+one channel's hits can run far further above its median than
+another's, and a single overall top list would be all one channel. Re-collect every week or two; `auto.py` says when
 the file is older than that.
 
 Then upload manually and record the ID:
