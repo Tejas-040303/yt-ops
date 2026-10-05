@@ -102,8 +102,37 @@ pip install -r requirements.txt
 python init_db.py
 ```
 
-`make.py --auto` also needs an Anthropic API key. Copy the template and
-put your key in it — `.env` is in `.gitignore` and never leaves your
+`make.py --auto` also needs a model to write with. `config.yaml` →
+`llm.provider` picks it; `YT_LLM_PROVIDER=gemini` in the environment
+overrides it for one run. Every step's prompt and schema is the same
+whichever you pick.
+
+| `llm.provider` | Paid with | Needs | Search |
+|---|---|---|---|
+| `claude_code` *(default)* | your Claude plan's usage, not API credits | Claude Code installed and signed in: `claude` on PATH, run once | Claude Code's web search, asked to keep to the lane's sites |
+| `gemini` | nothing, within the free tier's limits | `GEMINI_API_KEY` in `.env` — a free key from Google AI Studio | Google Search grounding, asked to keep to the lane's sites |
+| `claude_api` | Anthropic API credits (Opus 5.5) | `ANTHROPIC_API_KEY` in `.env`, credit on the account | locked to the lane's sites by the API |
+
+Only `claude_api` can lock search to a lane's sites. With the other two,
+`auto.py` drops every source off the lane's list, and every claim that
+rests on one, before the script is written, and prints what it dropped.
+
+What each costs you besides money:
+
+- **`claude_code`** sends Claude Code's own system prompt with every
+  call (about 15k tokens in a test), five or six calls a video, so it uses
+  up a plan's limits faster than the same work would through the API.
+  `llm.claude_code.model` picks `opus` or `sonnet`. It removes
+  `ANTHROPIC_API_KEY` from the `claude` it starts, so a key in your
+  environment cannot turn plan usage into an API bill. It runs with
+  web search only — no shell, no file edits.
+- **`gemini`** (`gemini-2.5-flash`) is a weaker researcher than Opus;
+  the fact check in the metadata file is the backstop either way. The
+  free tier caps requests per minute and per day, and Google's terms
+  let it use free-tier prompts to improve its products.
+
+Keys go in `.env` (`claude_code` needs none). Copy the template and put
+your key in it — `.env` is in `.gitignore` and never leaves your
 machine:
 
 ```bash
@@ -111,13 +140,13 @@ copy .env.example .env          # Windows cmd   (PowerShell: Copy-Item .env.exam
 cp .env.example .env            # macOS / Linux
 ```
 
-Then edit `.env` so it reads `ANTHROPIC_API_KEY=sk-ant-...` with your
-key. Avoid PowerShell's `echo ... > .env` (it writes UTF-16), and in
+Then edit `.env` so it reads `ANTHROPIC_API_KEY=sk-ant-...` or
+`GEMINI_API_KEY=...` with your key. Avoid PowerShell's `echo ... > .env` (it writes UTF-16), and in
 Notepad save as "All files" or you get `.env.txt`. `brain.py` reads any
 of these encodings and names the `.env.txt` mistake if it finds one.
 
-Nothing else in the pipeline needs it. A storyboard you wrote yourself
-renders without touching the API.
+Nothing else in the pipeline needs a model. A storyboard you wrote
+yourself renders without one.
 
 The [youtube-agent-skill](https://github.com/Tejas-040303/youtube-agent-skill)
 fork goes next to this checkout. Title ranking, the swipe file and
@@ -280,7 +309,9 @@ Hierarchy lives in foreign keys. Files get a flat readable code:
 | `make_vo.py` | *(superseded by `make.py`)* Video 1's TTS with its script hardcoded |
 | `captions.py` | Word timings → styled `.ass`. Isolates long tokens so dates hold alone |
 | `make.py` | **The pipeline.** Storyboard → voice, captions, scenes, SFX, render, metadata |
-| `brain.py` | The Claude API calls: scout the news, pick a subject, research it, write it, storyboard it — each briefed by its lane |
+| `brain.py` | The model calls: scout the news, pick a subject, research it, write it, storyboard it — each briefed by its lane. Runs them on the Claude API itself, or hands them to one of the two below (`llm.provider`) |
+| `brain_claude_code.py` | The same calls through `claude -p`, on a Claude plan instead of API credits |
+| `brain_gemini.py` | The same calls on Google's Gemini API |
 | `auto.py` | Picks the lane, runs those steps, enforces the gates, ranks the titles, writes the DB rows and the storyboard |
 | `ytskill.py` | The bridge to the youtube-agent-skill fork: title lint, swipe file, retention reading |
 | `collect_swipe.py` | Reads the comparable channels' public listings (config.yaml `swipe`) into `research/swipe.json` |

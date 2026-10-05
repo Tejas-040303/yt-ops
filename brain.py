@@ -51,8 +51,9 @@ _spend = {"in": 0, "out": 0, "calls": 0}
 PLACEHOLDER = "sk-ant-REPLACE-ME"   # the value .env.example ships with
 
 
-def _env_key(path):
-    """ANTHROPIC_API_KEY from a .env file, whatever wrote it.
+def _env_key(path, name="ANTHROPIC_API_KEY"):
+    """A key from a .env file (ANTHROPIC_API_KEY unless named), whatever
+    wrote the file.
 
     Windows PowerShell's `echo ... > .env` writes UTF-16 and Notepad may
     add a UTF-8 BOM, so the bytes are decoded by their BOM rather than
@@ -64,9 +65,8 @@ def _env_key(path):
     else:
         text = raw.decode("utf-8-sig", errors="replace")
     for line in text.splitlines():
-        name, eq, value = line.partition("=")
-        if eq and name.strip().removeprefix("export ").strip() == \
-                "ANTHROPIC_API_KEY":
+        key, eq, value = line.partition("=")
+        if eq and key.strip().removeprefix("export ").strip() == name:
             return value.strip().strip('"').strip("'")
     return None
 
@@ -108,10 +108,71 @@ def _charge(usage):
     _spend["calls"] += 1
 
 
+# --- which backend answers ----------------------------------------
+#
+# config.yaml llm.provider (or $YT_LLM_PROVIDER for one run):
+#   claude_api   the Anthropic API, below -- needs API credits
+#   claude_code  the `claude -p` CLI on your Claude plan (brain_claude_code.py)
+#   gemini       Google's Gemini API (brain_gemini.py)
+# Every step's prompt and schema is the same whichever answers.
+
+PROVIDERS = ("claude_api", "claude_code", "gemini")
+
+
+def _provider():
+    """(provider, its settings) from config.yaml, read once."""
+    if "provider" not in _spend:
+        llm = {}
+        try:
+            import yaml
+            cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "config.yaml")
+            llm = (yaml.safe_load(open(cfg, encoding="utf-8")) or {}).get(
+                "llm") or {}
+        except (OSError, ImportError):
+            pass
+        name = os.environ.get("YT_LLM_PROVIDER") or llm.get("provider") \
+            or "claude_api"
+        if name not in PROVIDERS:
+            raise SystemExit(f"llm.provider {name!r} -- choose one of "
+                             f"{', '.join(PROVIDERS)}")
+        _spend["provider"], _spend["settings"] = name, llm.get(name) or {}
+    return _spend["provider"], _spend["settings"]
+
+
+def provider():
+    """The backend this run uses: claude_api, claude_code or gemini."""
+    return _provider()[0]
+
+
+def _ask_elsewhere(provider, settings, **call):
+    if provider == "claude_code":
+        import brain_claude_code as backend
+    else:
+        import brain_gemini as backend
+    result, meter = backend.ask(**call, settings=settings)
+    _spend["in"] += meter["in"]
+    _spend["out"] += meter["out"]
+    _spend["calls"] += 1
+    if meter.get("usd") is not None:
+        _spend["usd"] = _spend.get("usd", 0.0) + meter["usd"]
+    return result
+
+
 def spend_line():
+    provider = _spend.get("provider", "claude_api")
+    tokens = (f"{_spend['calls']} calls, {_spend['in']:,} in / "
+              f"{_spend['out']:,} out tokens")
+    if provider == "claude_code":
+        usd = _spend.get("usd")
+        return (f"{tokens} via Claude Code -- counted against your Claude "
+                f"plan, not API credits"
+                + (f" (Claude Code's list-price estimate: ${usd:.2f})"
+                   if usd is not None else ""))
+    if provider == "gemini":
+        return (f"{tokens} via Gemini -- $0 within the free tier's limits")
     d = _spend["in"] * USD_IN + _spend["out"] * USD_OUT
-    return (f"{_spend['calls']} API calls, {_spend['in']:,} in / "
-            f"{_spend['out']:,} out tokens, about ${d:.2f} at listed "
+    return (f"{tokens} via the Anthropic API, about ${d:.2f} at listed "
             f"{MODEL} rates")
 
 
@@ -172,7 +233,17 @@ def _ask(system, prompt, schema=None, tools=None, effort="medium",
     Effort defaults to medium: on Opus 5.5 it is the documented starting
     point, which out-thinks Opus 5 at high and thinks more per level, so
     carrying "high" over would cost more than before for little gain.
+
+    With llm.provider set to claude_code or gemini, the same call goes to
+    that backend instead and nothing below runs.
     """
+    provider, settings = _provider()
+    if provider != "claude_api":
+        return _ask_elsewhere(provider, settings, system=system,
+                              prompt=prompt, schema=schema, tools=tools,
+                              effort=effort, max_tokens=max_tokens,
+                              label=label)
+
     import anthropic
 
     client = _client()

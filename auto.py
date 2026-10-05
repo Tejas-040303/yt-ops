@@ -50,6 +50,7 @@ import json
 import os
 import re
 import sqlite3
+from urllib.parse import urlparse
 
 import yaml
 
@@ -235,6 +236,30 @@ def check_sources(data, lane):
     if not data["claims"]:
         fails.append("no claim survived with a quote attached")
     return fails
+
+
+def on_lane_site(url, domains):
+    """True if the URL is on one of the lane's sites or a subdomain."""
+    host = (urlparse(url).hostname or "").lower()
+    host = host[4:] if host.startswith("www.") else host
+    return any(host == d or host.endswith("." + d) for d in domains)
+
+
+def keep_lane_sources(data, domains):
+    """Drop sources and claims whose page is not on the lane's sites.
+
+    On the Claude API the search tool cannot reach other sites, so this
+    only catches a link the model cited without searching for it. With
+    claude_code or gemini, search is not locked up front, so this is
+    where the lock holds."""
+    off = [s["url"] for s in data["sources"]
+           if not on_lane_site(s["url"], domains)]
+    data["sources"] = [s for s in data["sources"]
+                       if on_lane_site(s["url"], domains)]
+    before = len(data["claims"])
+    data["claims"] = [c for c in data["claims"]
+                      if on_lane_site(c["source_url"], domains)]
+    return off, before - len(data["claims"])
 
 
 def check_quote_cards(shots, cap):
@@ -468,7 +493,9 @@ def main(argv=None):
                                        if topic["person"] else ""))
         print(f"  gap: {topic['gap']}")
 
-    print(f"\nresearch  (domain-locked to the {lane_name} lane's domains)")
+    lock = ("domain-locked to" if brain.provider() == "claude_api"
+            else "asked to keep to, then filtered to")
+    print(f"\nresearch  ({lock} the {lane_name} lane's domains)")
     notes = brain.research(topic["title"], topic["person"], lane["domains"],
                            today, lane)
     notes_path = os.path.join(RESEARCH_DIR, f"{seq:04d}-notes.md")
@@ -476,6 +503,11 @@ def main(argv=None):
     print(f"  {notes_path}  ({len(notes.split())} words)")
 
     data = brain.extract(notes)
+    off_sites, off_claims = keep_lane_sources(data, lane["domains"])
+    for url in off_sites:
+        print(f"  dropped source off the {lane_name} lane's sites: {url}")
+    if off_claims:
+        print(f"  dropped {off_claims} claim(s) resting on those sources")
     claims_path = os.path.join(RESEARCH_DIR, f"{seq:04d}-claims.json")
     json.dump(data, open(claims_path, "w", encoding="utf-8"), indent=2)
     print(f"  {len(data['sources'])} sources, {len(data['claims'])} claims, "

@@ -182,6 +182,27 @@ sources:
   kinds_ranked: [primary, scholarly, museum, encyclopedia, news, popular]
   cache_locally: true              # sources disappear; keep a copy
 
+# --- Which model answers brain.py's research and writing steps. ---
+# Every step's prompt and schema is the same whichever you choose.
+#   claude_api   the Anthropic API with ANTHROPIC_API_KEY. Needs API
+#                credits. Search is locked to each lane's sites.
+#   claude_code  the `claude -p` CLI, signed in to your Claude plan --
+#                counts against the plan's usage, not API credits. Needs
+#                Claude Code installed and signed in on this machine.
+#   gemini       Google's Gemini API with GEMINI_API_KEY in .env (free
+#                key from Google AI Studio). Weaker for careful research.
+# With claude_code and gemini, search cannot be locked to a lane's sites
+# up front; auto.py drops any claim whose source is off the lane's list
+# afterwards (it runs for claude_api too, as a second check).
+# YT_LLM_PROVIDER=gemini in the environment overrides this for one run.
+llm:
+  provider: claude_code
+  claude_code:
+    model: opus          # or sonnet, or remove for your plan's default
+    timeout: 1800        # seconds per call; research is the long one
+  gemini:
+    model: gemini-2.5-flash
+
 # --- The youtube-agent-skill fork, used for title lint, the swipe file
 # and retention reports. Path is relative to this file. ---
 tools:
