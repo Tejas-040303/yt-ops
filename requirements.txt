@@ -37,3 +37,4 @@ tokenizers==0.23.2
 tqdm==4.70.0
 typing_extensions==4.16.0
 urllib3==2.7.0
+yt-dlp==2026.8.19

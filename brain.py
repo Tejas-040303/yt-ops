@@ -40,6 +40,29 @@ MAX_CONTINUATIONS = 5     # pause_turn restarts before giving up
 _spend = {"in": 0, "out": 0, "calls": 0}
 
 
+PLACEHOLDER = "sk-ant-REPLACE-ME"   # the value .env.example ships with
+
+
+def _env_key(path):
+    """ANTHROPIC_API_KEY from a .env file, whatever wrote it.
+
+    Windows PowerShell's `echo ... > .env` writes UTF-16 and Notepad may
+    add a UTF-8 BOM, so the bytes are decoded by their BOM rather than
+    assumed to be UTF-8 -- which used to crash here with
+    UnicodeDecodeError before the key was ever read."""
+    raw = open(path, "rb").read()
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        text = raw.decode("utf-16")
+    else:
+        text = raw.decode("utf-8-sig", errors="replace")
+    for line in text.splitlines():
+        name, eq, value = line.partition("=")
+        if eq and name.strip().removeprefix("export ").strip() == \
+                "ANTHROPIC_API_KEY":
+            return value.strip().strip('"').strip("'")
+    return None
+
+
 def _client():
     try:
         import anthropic
@@ -47,19 +70,27 @@ def _client():
         raise SystemExit(
             "pip install anthropic  -- needed for the research and script "
             "steps. Everything downstream of the storyboard runs without it.")
+    here = os.path.dirname(os.path.abspath(__file__))
+    env = os.path.join(here, ".env")
     if not (os.environ.get("ANTHROPIC_API_KEY")
             or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
-        env = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
         if os.path.exists(env):
-            for line in open(env, encoding="utf-8"):
-                if line.strip().startswith("ANTHROPIC_API_KEY"):
-                    os.environ["ANTHROPIC_API_KEY"] = \
-                        line.split("=", 1)[1].strip().strip('"').strip("'")
+            key = _env_key(env)
+            if key:
+                os.environ["ANTHROPIC_API_KEY"] = key
+    if os.environ.get("ANTHROPIC_API_KEY") == PLACEHOLDER:
+        raise SystemExit(f"{env} still has the placeholder from .env.example "
+                         f"-- put your real key in it.")
     if not (os.environ.get("ANTHROPIC_API_KEY")
             or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        hint = ""
+        if os.path.exists(env + ".txt"):
+            hint = (" There is a .env.txt -- Notepad added .txt; rename it "
+                    "to .env.")
         raise SystemExit(
-            "No ANTHROPIC_API_KEY. Put it in the environment or in a .env "
-            "file next to brain.py as ANTHROPIC_API_KEY=sk-ant-...")
+            "No ANTHROPIC_API_KEY. Copy .env.example to .env next to "
+            "brain.py and put your key in it, or set it in the "
+            "environment." + hint)
     return anthropic.Anthropic(timeout=900.0)
 
 
