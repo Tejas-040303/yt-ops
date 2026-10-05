@@ -33,6 +33,26 @@ gates:
     - drugs_weapons_and_gambling
     - conspiracy_theories_presented_as_open_questions
     - sexual_content
+  # Swipe leads are screened against these words before the model sees
+  # them (auto.py leads_from_swipe), so a grey-area hit on a comparable
+  # channel never becomes a suggestion. A tripwire, not a judge: it
+  # misses a topic phrased without these words, and can drop a harmless
+  # title that uses one -- which costs only a lead. The prompt rule above
+  # still applies to everything. Whole words, any case.
+  banned_lead_keywords:
+    medical_advice: [cure, cures, diet, supplement, supplements, weight loss, dosage, symptoms]
+    financial_advice: [invest, investing, investment, stocks, crypto, bitcoin, get rich, passive income]
+    legal_advice: [lawyer, lawsuit, sue]
+    religion: [religion, religious, god, gods, bible, quran, prayer]
+    politics_elections_and_policy_debates: [election, elections, vote, voting, president, legalize, legalizing, legalization, abortion, immigration]
+    current_conflicts_and_terrorism: [terror, terrorism, terrorist, invasion, airstrike]
+    atrocity_and_genocide: [genocide, massacre, holocaust, atrocity]
+    recent_disasters_and_deaths: [death toll, killed, victims, tragedy]
+    crime_and_ongoing_trials: [crime, crimes, murder, murdered, killer, trial, convicted, arrested]
+    children_as_subjects: [child, children, kid, kids]
+    drugs_weapons_and_gambling: [drug, drugs, cocaine, heroin, meth, fentanyl, opioid, opioids, cannabis, marijuana, psychedelic, psychedelics, gun, guns, firearm, firearms, weapon, weapons, casino, gambling, betting]
+    conspiracy_theories_presented_as_open_questions: [conspiracy, hoax, cover-up, flat earth]
+    sexual_content: [sex, sexual, porn]
 
 # --- Lanes: three kinds of video, one channel. ---
 # auto.py makes whichever lane is furthest behind its share, or the one
