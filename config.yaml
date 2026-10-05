@@ -167,6 +167,23 @@ sources:
 tools:
   youtube_agent_skill: "../youtube-agent-skill"
 
+# --- Comparable channels, for the swipe file (collect_swipe.py). ---
+# Their outliers -- videos that beat their own channel's median -- steer
+# topic selection as direction, never as titles to copy. Kurzgesagt is
+# the closest look (all animation); Veritasium the closest subject (how
+# somebody found out). Both are mostly long-form, so the Shorts tab is
+# the default: add "videos" to tabs to read their long uploads too.
+swipe:
+  file: "research/swipe.json"
+  tabs: [shorts]
+  per_channel: 60                  # newest N from each tab
+  skip_newest: 5                   # still gathering views; would read as flops
+  channels:
+    - name: "Veritasium"
+      url: "https://www.youtube.com/@veritasium"
+    - name: "Kurzgesagt"
+      url: "https://www.youtube.com/@kurzgesagt"
+
 # --- Accounts (competing versions of the story) ---
 accounts:
   stances: [popular, consensus, disputed, superseded, fringe]
