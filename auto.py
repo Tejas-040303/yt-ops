@@ -272,6 +272,15 @@ def leads_from_swipe(path, limit=8):
         return ""
     top = rows["outliers"][:limit]
     print(f"  {len(top)} outliers from {path}")
+    try:
+        when = json.load(open(path, encoding="utf-8")).get("collected_at")
+        age = (datetime.date.today()
+               - datetime.date.fromisoformat(when)).days
+        if age > 14:
+            print(f"  NOTE  collected {age} days ago -- re-run "
+                  f"collect_swipe.py for what is working now")
+    except (AttributeError, TypeError, ValueError):
+        pass   # a hand-made list with no collected_at
     return "\n".join(f"- {r['multiple']}x its channel's median: "
                      f"{r['title']} ({r['formula']})" for r in top)
 

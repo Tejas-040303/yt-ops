@@ -195,11 +195,22 @@ blocks — `script`, `shots`, `metadata` — and the rules are enforced, not
 documented: every script line must be covered by exactly one shot, in
 order, or `make.py` refuses to run.
 
-`--swipe` takes a listing of comparable channels' videos — collect it
-with `yt-dlp --flat-playlist -J` per channel, shaped as
-[yt-viral](https://github.com/Tejas-040303/youtube-agent-skill/tree/main/skills/yt-viral)
-describes. The outliers, ranked by how far each beat its own channel's
-median, go to topic selection as direction, never as titles to copy.
+`--swipe` takes a listing of comparable channels' videos. The channels
+are in `config.yaml` under `swipe` — Veritasium and Kurzgesagt, their
+Shorts tabs — and one command collects them (needs `pip install yt-dlp`):
+
+```bash
+python collect_swipe.py                          # -> research/swipe.json
+python make.py --auto --swipe research/swipe.json
+```
+
+[yt-viral](https://github.com/Tejas-040303/youtube-agent-skill/tree/main/skills/yt-viral)'s
+`swipe.py` ranks every video by how far it beat its own channel's
+median, so a 2M-view Short on a channel whose Shorts usually get 2M is
+nothing, and the same video on a channel whose median is 400k is the
+thing to study. The outliers go to topic selection as direction, never
+as titles to copy. Re-collect every week or two; `auto.py` says when
+the file is older than that.
 
 Then upload manually and record the ID:
 
@@ -260,6 +271,7 @@ Hierarchy lives in foreign keys. Files get a flat readable code:
 | `brain.py` | The Claude API calls: scout the news, pick a subject, research it, write it, storyboard it — each briefed by its lane |
 | `auto.py` | Picks the lane, runs those steps, enforces the gates, ranks the titles, writes the DB rows and the storyboard |
 | `ytskill.py` | The bridge to the youtube-agent-skill fork: title lint, swipe file, retention reading |
+| `collect_swipe.py` | Reads the comparable channels' public listings (config.yaml `swipe`) into `research/swipe.json` |
 | `retention_report.py` | A Studio retention export → the line and scene behind every drop |
 | `research/` | Per-video audit trail: the raw notes and the claims with their quotes. Not in git |
 | `shots/NNNN.yaml` | One storyboard per video. The only file that changes between videos |
